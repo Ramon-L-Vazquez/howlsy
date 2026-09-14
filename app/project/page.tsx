@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const projectSteps = [
   {
@@ -29,12 +29,24 @@ const materials = [
 ];
 
 export default function ProjectPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const goal = searchParams.get("goal") ?? "Untitled project";
   const context = searchParams.get("context") ?? "";
   const experience = searchParams.get("experience") ?? "";
   const constraints = searchParams.get("constraints") ?? "";
+
+  function handleStartGuidedMode() {
+    const params = new URLSearchParams({
+      goal,
+      context,
+      experience,
+      constraints,
+    });
+
+    router.push(`/guided?${params.toString()}`);
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -186,6 +198,7 @@ export default function ProjectPage() {
 
         <button
           type="button"
+          onClick={handleStartGuidedMode}
           className="mt-10 w-full rounded-2xl bg-cyan-400 px-6 py-4 text-base font-semibold text-slate-950 transition hover:bg-cyan-300"
         >
           Start guided mode
