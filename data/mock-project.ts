@@ -433,6 +433,10 @@ export const mockProject: HowlsyProject = {
 
   sources: [],
 
+  progress: {
+    completedStepIds: [],
+  },
+
   createdAt: "2026-09-14T00:00:00.000Z",
 
   updatedAt: "2026-09-14T00:00:00.000Z",

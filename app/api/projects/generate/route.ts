@@ -1123,6 +1123,15 @@ ${constraints || "No constraints provided."}
         })
       ),
 
+      /*
+       * Progress belongs to Howlsy's application state rather than the
+       * AI-generated planning response. A newly generated project is
+       * ready to begin but has not completed or entered any step yet.
+       */
+      progress: {
+        completedStepIds: [],
+      },
+
       createdAt: timestamp,
 
       updatedAt: timestamp,

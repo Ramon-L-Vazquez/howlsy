@@ -226,6 +226,16 @@ export type ProjectSource = {
   notes?: string;
 };
 
+export type ProjectProgress = {
+  completedStepIds: string[];
+
+  currentStepId?: string;
+
+  startedAt?: string;
+
+  completedAt?: string;
+};
+
 export type HowlsyProject = {
   id: string;
 
@@ -262,6 +272,8 @@ export type HowlsyProject = {
   steps: ProjectStep[];
 
   sources: ProjectSource[];
+
+  progress: ProjectProgress;
 
   createdAt: string;
 
