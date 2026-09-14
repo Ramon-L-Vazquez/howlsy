@@ -596,6 +596,425 @@ Creating a persistence boundary early also reduces the amount of application cod
 
 ---
 
+## 2026-09-14 — AI Project Response Persistence Contract Failure
+
+### Problem
+
+After connecting the Howlsy intake experience to the live AI project-generation API, the application successfully generated a project but crashed when navigating to:
+
+```text
+/project
+```
+
+The browser reported:
+
+```text
+Runtime TypeError
+
+Cannot read properties of undefined (reading 'summary')
+```
+
+The failure occurred in:
+
+```text
+app/project/page.tsx
+```
+
+at:
+
+```tsx
+project.safety.summary
+```
+
+The project page expected `project` to conform to the `HowlsyProject` contract, including:
+
+```text
+project.safety.summary
+```
+
+However, the object recovered from browser storage did not have `safety` at the expected level.
+
+---
+
+### Investigation
+
+The AI generation endpoint correctly constructed a complete `HowlsyProject`.
+
+The API returned the project using a response envelope:
+
+```ts
+return NextResponse.json({
+  project,
+});
+```
+
+Therefore, the actual HTTP response shape was:
+
+```text
+{
+  project: HowlsyProject
+}
+```
+
+The intake page, however, originally parsed the entire response as though the response itself were a `HowlsyProject`:
+
+```ts
+const project =
+  (await response.json()) as HowlsyProject;
+
+saveProject(project);
+```
+
+This created a contract mismatch.
+
+Instead of storing:
+
+```text
+HowlsyProject
+```
+
+the browser persisted:
+
+```text
+{
+  project: HowlsyProject
+}
+```
+
+The malformed object was then recovered by `getProject()` and passed to the project page.
+
+The UI expected:
+
+```text
+project.safety.summary
+```
+
+but the persisted object's actual path was:
+
+```text
+project.project.safety.summary
+```
+
+As a result:
+
+```text
+project.safety
+```
+
+was `undefined`, causing the runtime crash.
+
+---
+
+### Why TypeScript Did Not Catch the Problem
+
+The bug exposed an important distinction between compile-time TypeScript types and runtime data validation.
+
+The intake implementation used:
+
+```ts
+(await response.json()) as HowlsyProject
+```
+
+and the browser persistence implementation used a similar assertion after parsing `localStorage`.
+
+A TypeScript `as` assertion does not inspect or validate the runtime object.
+
+It only tells the TypeScript compiler to treat the value as the specified type.
+
+Therefore, TypeScript accepted the code even though the actual runtime object had the wrong structure.
+
+The same issue existed at the persistence boundary.
+
+The original browser store effectively trusted:
+
+```ts
+JSON.parse(storedProject) as HowlsyProject
+```
+
+This meant malformed, outdated, or otherwise invalid browser data could enter the application while appearing correctly typed to the compiler.
+
+---
+
+### First Fix — Correct the API Response Contract
+
+The intake page was updated to explicitly represent the actual API response:
+
+```ts
+type GenerateProjectResponse = {
+  project: HowlsyProject;
+};
+```
+
+The response is now parsed as:
+
+```ts
+const data =
+  (await response.json()) as GenerateProjectResponse;
+```
+
+The project itself is then explicitly unwrapped:
+
+```ts
+saveProject(data.project);
+```
+
+This restores the intended flow:
+
+```text
+POST /api/projects/generate
+        ↓
+{
+  project: HowlsyProject
+}
+        ↓
+data.project
+        ↓
+saveProject()
+        ↓
+HowlsyProject
+```
+
+New AI-generated projects are therefore persisted using the correct application-owned project structure.
+
+---
+
+### Second Problem — Existing Malformed Browser Data
+
+Correcting the intake page prevented future malformed projects from being stored.
+
+However, testing revealed that the application could still crash.
+
+The previously malformed project remained inside browser `localStorage`.
+
+Refreshing `/project` therefore continued loading the old invalid structure.
+
+This demonstrated that fixing the writer was not sufficient.
+
+The persistence reader also needed to protect the application from invalid historical data.
+
+---
+
+### Second Fix — Runtime Validation at the Persistence Boundary
+
+The browser project store was strengthened so that persisted values are treated as untrusted runtime data.
+
+A lightweight runtime type guard was added:
+
+```ts
+isHowlsyProject()
+```
+
+The guard verifies important parts of the project structure before allowing the object into the application, including:
+
+```text
+id
+title
+description
+category
+status
+difficulty
+estimatedDuration
+goal
+context
+experience
+constraints
+safety
+tools
+materials
+steps
+createdAt
+updatedAt
+```
+
+The safety object is also checked before the project can reach the UI.
+
+This prevents malformed browser data from being blindly trusted through a TypeScript assertion.
+
+The new persistence boundary follows:
+
+```text
+localStorage
+    ↓
+JSON.parse()
+    ↓
+unknown
+    ↓
+runtime validation
+    ↓
+valid HowlsyProject
+    ↓
+application
+```
+
+Invalid data returns:
+
+```text
+null
+```
+
+rather than being allowed to crash the project interface.
+
+---
+
+### Legacy Data Migration
+
+Because the malformed project had already been written during development, Howlsy also received a small compatibility migration.
+
+The project store detects the known legacy shape:
+
+```text
+{
+  project: HowlsyProject
+}
+```
+
+If the nested project passes runtime validation, Howlsy extracts it:
+
+```text
+legacy response envelope
+        ↓
+nested project
+        ↓
+runtime validation
+        ↓
+valid HowlsyProject
+```
+
+The valid nested project is then written back to browser storage using the current format:
+
+```text
+{
+  project: HowlsyProject
+}
+        ↓
+HowlsyProject
+        ↓
+saveProject()
+        ↓
+correct localStorage record
+```
+
+This allows existing development data to repair itself without requiring the browser's storage to be manually cleared.
+
+---
+
+### Verification
+
+After correcting the API response handling and strengthening the persistence layer, the production build was run:
+
+```bash
+npm run build
+```
+
+The build completed successfully:
+
+```text
+Creating an optimized production build ...
+✓ Compiled successfully
+✓ Finished TypeScript
+✓ Collecting page data
+✓ Generating static pages
+✓ Finalizing page optimization
+```
+
+The build included:
+
+```text
+/
+ƒ /api/projects/generate
+/guided
+/icon.svg
+/intake
+/project
+```
+
+The existing malformed browser project was deliberately left in `localStorage`.
+
+The `/project` route was then refreshed without manually clearing or replacing that data.
+
+The persistence layer successfully detected the legacy response envelope, validated the nested `HowlsyProject`, migrated it to the correct storage format, and loaded the project.
+
+The original runtime failure:
+
+```text
+Cannot read properties of undefined (reading 'summary')
+```
+
+no longer occurred.
+
+This verified both the immediate bug fix and the legacy-data repair path.
+
+---
+
+### Result
+
+Howlsy's AI project flow now has a clearer contract across the client and persistence boundaries:
+
+```text
+User Intake
+    ↓
+POST /api/projects/generate
+    ↓
+AI Structured Planning Data
+    ↓
+Server-owned HowlsyProject
+    ↓
+{
+  project: HowlsyProject
+}
+    ↓
+Client unwraps data.project
+    ↓
+saveProject()
+    ↓
+localStorage
+    ↓
+runtime validation
+    ↓
+Project View
+```
+
+Existing data using the accidentally persisted response envelope can also be migrated automatically.
+
+The project page no longer has to assume that any JSON object recovered from browser storage is valid merely because TypeScript has assigned it a project type.
+
+---
+
+### Technical Lesson
+
+TypeScript protects compile-time relationships between values that the application already understands.
+
+It does not validate external or persisted runtime data.
+
+Data crossing boundaries such as:
+
+```text
+HTTP responses
+localStorage
+databases
+files
+third-party APIs
+AI-generated structured output
+```
+
+should be treated as untrusted until its runtime structure has been verified.
+
+A type assertion such as:
+
+```ts
+value as HowlsyProject
+```
+
+is not validation.
+
+This incident also demonstrated why bug verification should reproduce the original failure state whenever possible.
+
+Instead of clearing the malformed browser data and hiding the problem, the existing broken record was retained and used to verify that the new migration logic could repair it.
+
+As Howlsy grows, API, AI, persistence, and database boundaries should increasingly use explicit runtime schemas rather than relying only on TypeScript assertions.
+
+---
+
 ## Development Principle
 
 Howlsy development follows a simple rule:
