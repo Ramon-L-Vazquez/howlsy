@@ -32,21 +32,89 @@ type GeneratedProjectPlan = {
   tools: Array<{
     name: string;
     required: boolean;
+    quantity: string;
     notes: string;
+    safetyNotes: string;
   }>;
 
   materials: Array<{
     name: string;
     quantity: string;
     estimatedCost: number;
+    dimensions: string;
+    specifications: string;
     notes: string;
   }>;
 
   steps: Array<{
     title: string;
+    summary: string;
     instructions: string;
     completionCheck: string;
     warning: string;
+    estimatedDuration: string;
+
+    measurements: Array<{
+      label: string;
+      value: string;
+      unit: string;
+      tolerance: string;
+      notes: string;
+      source: string;
+      verified: boolean;
+    }>;
+
+    specifications: Array<{
+      name: string;
+      value: string;
+      notes: string;
+      source: string;
+      verified: boolean;
+    }>;
+
+    visualInstructions: Array<{
+      title: string;
+      description: string;
+      resourceType:
+        | "illustration"
+        | "diagram"
+        | "blueprint"
+        | "annotated_image"
+        | "three_d";
+      required: boolean;
+      requestedDetails: string[];
+    }>;
+
+    troubleshooting: Array<{
+      condition: string;
+      explanation: string;
+      nextAction: string;
+      expectedResult: string;
+      warning: string;
+    }>;
+
+    accessibility: {
+      visualDescription: string;
+      audioExplanation: string;
+      transcript: string;
+    };
+  }>;
+
+  sources: Array<{
+    title: string;
+    publisher: string;
+    url: string;
+    sourceType:
+      | "manufacturer"
+      | "code"
+      | "government"
+      | "manual"
+      | "technical_document"
+      | "reference"
+      | "video"
+      | "other";
+    verified: boolean;
+    notes: string;
   }>;
 };
 
@@ -141,12 +209,26 @@ const howlsyProjectPlanSchema = {
             type: "boolean",
           },
 
+          quantity: {
+            type: "string",
+          },
+
           notes: {
+            type: "string",
+          },
+
+          safetyNotes: {
             type: "string",
           },
         },
 
-        required: ["name", "required", "notes"],
+        required: [
+          "name",
+          "required",
+          "quantity",
+          "notes",
+          "safetyNotes",
+        ],
       },
     },
 
@@ -170,6 +252,14 @@ const howlsyProjectPlanSchema = {
             type: "number",
           },
 
+          dimensions: {
+            type: "string",
+          },
+
+          specifications: {
+            type: "string",
+          },
+
           notes: {
             type: "string",
           },
@@ -179,6 +269,8 @@ const howlsyProjectPlanSchema = {
           "name",
           "quantity",
           "estimatedCost",
+          "dimensions",
+          "specifications",
           "notes",
         ],
       },
@@ -196,6 +288,10 @@ const howlsyProjectPlanSchema = {
             type: "string",
           },
 
+          summary: {
+            type: "string",
+          },
+
           instructions: {
             type: "string",
           },
@@ -207,13 +303,279 @@ const howlsyProjectPlanSchema = {
           warning: {
             type: "string",
           },
+
+          estimatedDuration: {
+            type: "string",
+          },
+
+          measurements: {
+            type: "array",
+
+            items: {
+              type: "object",
+              additionalProperties: false,
+
+              properties: {
+                label: {
+                  type: "string",
+                },
+
+                value: {
+                  type: "string",
+                },
+
+                unit: {
+                  type: "string",
+                },
+
+                tolerance: {
+                  type: "string",
+                },
+
+                notes: {
+                  type: "string",
+                },
+
+                source: {
+                  type: "string",
+                },
+
+                verified: {
+                  type: "boolean",
+                },
+              },
+
+              required: [
+                "label",
+                "value",
+                "unit",
+                "tolerance",
+                "notes",
+                "source",
+                "verified",
+              ],
+            },
+          },
+
+          specifications: {
+            type: "array",
+
+            items: {
+              type: "object",
+              additionalProperties: false,
+
+              properties: {
+                name: {
+                  type: "string",
+                },
+
+                value: {
+                  type: "string",
+                },
+
+                notes: {
+                  type: "string",
+                },
+
+                source: {
+                  type: "string",
+                },
+
+                verified: {
+                  type: "boolean",
+                },
+              },
+
+              required: [
+                "name",
+                "value",
+                "notes",
+                "source",
+                "verified",
+              ],
+            },
+          },
+
+          visualInstructions: {
+            type: "array",
+
+            items: {
+              type: "object",
+              additionalProperties: false,
+
+              properties: {
+                title: {
+                  type: "string",
+                },
+
+                description: {
+                  type: "string",
+                },
+
+                resourceType: {
+                  type: "string",
+                  enum: [
+                    "illustration",
+                    "diagram",
+                    "blueprint",
+                    "annotated_image",
+                    "three_d",
+                  ],
+                },
+
+                required: {
+                  type: "boolean",
+                },
+
+                requestedDetails: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                },
+              },
+
+              required: [
+                "title",
+                "description",
+                "resourceType",
+                "required",
+                "requestedDetails",
+              ],
+            },
+          },
+
+          troubleshooting: {
+            type: "array",
+
+            items: {
+              type: "object",
+              additionalProperties: false,
+
+              properties: {
+                condition: {
+                  type: "string",
+                },
+
+                explanation: {
+                  type: "string",
+                },
+
+                nextAction: {
+                  type: "string",
+                },
+
+                expectedResult: {
+                  type: "string",
+                },
+
+                warning: {
+                  type: "string",
+                },
+              },
+
+              required: [
+                "condition",
+                "explanation",
+                "nextAction",
+                "expectedResult",
+                "warning",
+              ],
+            },
+          },
+
+          accessibility: {
+            type: "object",
+            additionalProperties: false,
+
+            properties: {
+              visualDescription: {
+                type: "string",
+              },
+
+              audioExplanation: {
+                type: "string",
+              },
+
+              transcript: {
+                type: "string",
+              },
+            },
+
+            required: [
+              "visualDescription",
+              "audioExplanation",
+              "transcript",
+            ],
+          },
         },
 
         required: [
           "title",
+          "summary",
           "instructions",
           "completionCheck",
           "warning",
+          "estimatedDuration",
+          "measurements",
+          "specifications",
+          "visualInstructions",
+          "troubleshooting",
+          "accessibility",
+        ],
+      },
+    },
+
+    sources: {
+      type: "array",
+
+      items: {
+        type: "object",
+        additionalProperties: false,
+
+        properties: {
+          title: {
+            type: "string",
+          },
+
+          publisher: {
+            type: "string",
+          },
+
+          url: {
+            type: "string",
+          },
+
+          sourceType: {
+            type: "string",
+            enum: [
+              "manufacturer",
+              "code",
+              "government",
+              "manual",
+              "technical_document",
+              "reference",
+              "video",
+              "other",
+            ],
+          },
+
+          verified: {
+            type: "boolean",
+          },
+
+          notes: {
+            type: "string",
+          },
+        },
+
+        required: [
+          "title",
+          "publisher",
+          "url",
+          "sourceType",
+          "verified",
+          "notes",
         ],
       },
     },
@@ -231,6 +593,7 @@ const howlsyProjectPlanSchema = {
     "tools",
     "materials",
     "steps",
+    "sources",
   ],
 };
 
@@ -295,21 +658,24 @@ export async function POST(request: Request) {
           role: "system",
 
           content: `
-You are Howlsy, an AI project-planning system.
+You are Howlsy, an AI guided-action and project-planning system.
 
 Your job is to transform a user's real-world goal into a structured,
-practical project plan.
+practical, highly detailed project plan.
 
-Howlsy is not a generic chatbot.
+Howlsy is not a generic chatbot and must not produce generic,
+cookie-cutter instructions.
 
 Its purpose is to answer:
 
-"What should I do next?"
+"What should I do next, exactly?"
 
-Create plans that are detailed enough for a user to actually perform
-the task.
+The project must be detailed enough for the user to understand what to
+do, what they need, what they should see, what they should measure,
+what result they should expect, and what to do when the result differs
+from expectations.
 
-Requirements:
+CORE PROJECT REQUIREMENTS
 
 - Create a clear, practical project title.
 - Generate a concise project description.
@@ -318,32 +684,162 @@ Requirements:
 - Estimate duration conservatively.
 - Estimate cost conservatively.
 - Identify required and optional tools.
+- Include useful tool quantities when relevant.
 - Identify required materials and useful quantities.
+- Include material dimensions and specifications when reasonably known.
 - Produce ordered, actionable project steps.
-- Give exact measurements, dimensions, specifications, settings, or
-  expected values when they can reasonably be determined.
-- Do not invent exact measurements when the user's real-world situation
-  must be measured first.
-- Include a completion check for every step.
-- Include warnings whenever a step contains meaningful risk.
+- Adapt detail to the user's stated experience.
+- Prefer precise instructions over vague instructions.
+- Do not add unnecessary filler.
+
+STEP DETAIL REQUIREMENTS
+
+Every step must explain the work in enough detail that the user can
+understand exactly what action to perform.
+
+For each step:
+
+- Give a concise summary.
+- Give detailed instructions.
+- Estimate step duration when reasonably possible.
+- Include a clear completion check.
+- Include warnings whenever meaningful risk exists.
+- Identify measurements that matter to the step.
+- Identify technical specifications that matter to the step.
+- Identify useful troubleshooting branches for likely failure states.
+- Explain what the user should observe or verify before continuing.
+
+MEASUREMENTS AND SPECIFICATIONS
+
+- Give exact measurements, dimensions, specifications, settings,
+  clearances, torque values, electrical values, pressures, temperatures,
+  tolerances, or expected readings when they can reasonably be determined.
+- Never invent an exact measurement when the user's real-world object or
+  situation must first be measured.
+- If the user must measure something, state what must be measured.
+- Mark AI planning information as unverified unless it is genuinely
+  supported by a verified source supplied to the system.
+- Do not claim that a measurement or specification has been verified
+  merely because it is commonly used.
+
+VISUAL INSTRUCTION PLANNING
+
+Howlsy is designed to become a visual interactive manual, not merely a
+text instruction generator.
+
+For every step, determine whether the user would benefit from:
+
+- an instructional illustration
+- an exploded or assembly diagram
+- a wiring, plumbing, routing, or system diagram
+- a dimensioned blueprint
+- an annotated user photograph
+- a three-dimensional interactive model
+
+When a visual would materially improve understanding, add a
+visualInstructions entry.
+
+Describe exactly what the visual should show.
+
+For a blueprint or dimensioned drawing, requestedDetails should identify
+the views, dimensions, labels, materials, orientation, scale information,
+or other details that should appear.
+
+For an annotated image, explain what components, locations, fasteners,
+connections, defects, measurements, or actions should be highlighted.
+
+Do not pretend that a visual has already been generated.
+
+The visualInstructions array is a specification for Howlsy's later visual
+generation and enrichment systems.
+
+RESOURCE AND PRODUCT INTEGRITY
+
+This planning endpoint does not independently browse the web, retrieve
+manufacturer catalogs, verify product inventory, or generate media.
+
+Therefore:
+
+- Do not invent product URLs.
+- Do not invent video URLs.
+- Do not invent document URLs.
+- Do not invent manufacturer URLs.
+- Do not invent citations.
+- Do not claim compatibility has been verified unless verified source
+  information was actually supplied.
+- Do not claim a source was retrieved when it was not.
+- Leave project sources empty unless actual source information was
+  supplied in the intake.
+- Actual images, diagrams, videos, products, parts, documents, and
+  authoritative sources will be attached by later Howlsy enrichment
+  systems.
+
+SAFETY
+
 - Identify relevant hazards and protective equipment.
 - Recommend professional assistance when licensed, specialized,
   structural, electrical, gas, medical, legal, hazardous, or otherwise
   high-risk work may require it.
-- Distinguish estimates from verified facts.
 - Never claim a law, code, specification, diagnosis, compatibility,
   measurement, or safety condition has been verified when it has not.
-- Adapt the level of explanation to the user's stated experience.
-- Prefer precise instructions over vague instructions.
-- Do not add unnecessary filler.
+- Distinguish estimates from verified facts.
+- Never let visual detail or step detail imply that dangerous work is
+  safe merely because instructions are available.
 
-Howlsy projects will eventually support interactive diagrams,
-zoomable illustrations, videos, 3D models, product references,
-audio explanations, captions, transcripts, and accessible guided
-experiences. Structure the written plan so individual steps can later
-be enriched with those resources.
+TROUBLESHOOTING
 
-Use an empty string when an optional note or warning is unnecessary.
+When useful, create branches such as:
+
+"If you observe X..."
+"Check Y..."
+"If the reading is Z..."
+"Do not continue if..."
+"The expected result is..."
+
+Troubleshooting should help the user decide what to do next instead of
+forcing them to restart the project or guess.
+
+ACCESSIBILITY
+
+Howlsy should remain usable when visual or audio resources are later
+added.
+
+For each step:
+
+- Provide a useful visual description when visual instruction is planned.
+- Provide an audio-friendly explanation of the action.
+- Provide transcript-ready instructional text.
+- Do not rely on color alone to communicate meaning.
+
+RICH PROJECT PRINCIPLE
+
+A Howlsy project should eventually be capable of becoming:
+
+goal
+  ↓
+detailed plan
+  ↓
+step-by-step manual
+  ↓
+measurements + specifications
+  ↓
+illustrations + diagrams + blueprints
+  ↓
+videos + interactive resources
+  ↓
+products + compatible parts
+  ↓
+verified references
+  ↓
+adaptive troubleshooting
+  ↓
+accessible guided execution
+
+This endpoint creates the structured planning layer that those later
+systems will enrich.
+
+Use an empty string when an optional string value is unnecessary.
+Use an empty array when a collection has no applicable entries.
           `.trim(),
         },
 
@@ -446,7 +942,12 @@ ${constraints || "No constraints provided."}
 
         required: tool.required,
 
+        quantity: tool.quantity || undefined,
+
         notes: tool.notes || undefined,
+
+        safetyNotes:
+          tool.safetyNotes || undefined,
       })),
 
       materials: generatedPlan.materials.map(
@@ -458,6 +959,12 @@ ${constraints || "No constraints provided."}
 
           estimatedCost:
             material.estimatedCost,
+
+          dimensions:
+            material.dimensions || undefined,
+
+          specifications:
+            material.specifications || undefined,
 
           notes:
             material.notes || undefined,
@@ -472,6 +979,9 @@ ${constraints || "No constraints provided."}
 
           title: step.title,
 
+          summary:
+            step.summary || undefined,
+
           instructions: step.instructions,
 
           completionCheck:
@@ -479,6 +989,137 @@ ${constraints || "No constraints provided."}
 
           warning:
             step.warning || undefined,
+
+          estimatedDuration:
+            step.estimatedDuration || undefined,
+
+          measurements: step.measurements.map(
+            (measurement) => ({
+              label: measurement.label,
+
+              value: measurement.value,
+
+              unit:
+                measurement.unit || undefined,
+
+              tolerance:
+                measurement.tolerance || undefined,
+
+              notes:
+                measurement.notes || undefined,
+
+              source:
+                measurement.source || undefined,
+
+              verified: measurement.verified,
+            })
+          ),
+
+          specifications: step.specifications.map(
+            (specification) => ({
+              name: specification.name,
+
+              value: specification.value,
+
+              notes:
+                specification.notes || undefined,
+
+              source:
+                specification.source || undefined,
+
+              verified: specification.verified,
+            })
+          ),
+
+          visualInstructions:
+            step.visualInstructions.map((visual) => ({
+              title: visual.title,
+
+              description: visual.description,
+
+              resourceType: visual.resourceType,
+
+              required: visual.required,
+
+              requestedDetails:
+                visual.requestedDetails,
+            })),
+
+          /*
+           * Actual rich resources are attached by later enrichment
+           * systems. The planning model describes what should exist
+           * without pretending that media has already been generated
+           * or retrieved.
+           */
+          resources: [],
+
+          /*
+           * Product and part references require a separate retrieval
+           * and compatibility-verification layer. The planning model
+           * must not invent purchasable items or URLs.
+           */
+          products: [],
+
+          troubleshooting:
+            step.troubleshooting.map(
+              (branch, branchIndex) => ({
+                id: `step-${index + 1}-branch-${
+                  branchIndex + 1
+                }`,
+
+                condition: branch.condition,
+
+                explanation: branch.explanation,
+
+                nextAction: branch.nextAction,
+
+                expectedResult:
+                  branch.expectedResult || undefined,
+
+                warning:
+                  branch.warning || undefined,
+              })
+            ),
+
+          accessibility: {
+            visualDescription:
+              step.accessibility.visualDescription ||
+              undefined,
+
+            audioExplanation:
+              step.accessibility.audioExplanation ||
+              undefined,
+
+            transcript:
+              step.accessibility.transcript ||
+              undefined,
+          },
+        })
+      ),
+
+      /*
+       * The planning endpoint has no retrieval system yet, so it must
+       * not fabricate citations. Real sources will be populated by a
+       * dedicated retrieval and verification layer.
+       */
+      sources: generatedPlan.sources.map(
+        (source) => ({
+          id: randomUUID(),
+
+          title: source.title,
+
+          publisher:
+            source.publisher || undefined,
+
+          url:
+            source.url || undefined,
+
+          sourceType: source.sourceType,
+
+          verified: source.verified,
+
+          notes:
+            source.notes || undefined,
         })
       ),
 
