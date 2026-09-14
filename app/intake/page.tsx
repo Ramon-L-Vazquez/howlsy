@@ -27,6 +27,10 @@ const questions = [
   },
 ];
 
+type GenerateProjectResponse = {
+  project: HowlsyProject;
+};
+
 function IntakeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -127,9 +131,28 @@ function IntakeContent() {
         );
       }
 
-      const project = (await response.json()) as HowlsyProject;
+      /*
+       * The project-generation API deliberately wraps the generated
+       * project in a response object:
+       *
+       * {
+       *   project: HowlsyProject
+       * }
+       *
+       * We must unwrap that response before saving it. Saving the
+       * response envelope itself would produce an invalid project
+       * shape in browser storage.
+       */
+      const data =
+        (await response.json()) as GenerateProjectResponse;
 
-      saveProject(project);
+      if (!data.project) {
+        throw new Error(
+          "Howlsy received an invalid project response. Please try again."
+        );
+      }
+
+      saveProject(data.project);
 
       router.push("/project");
     } catch (error) {
