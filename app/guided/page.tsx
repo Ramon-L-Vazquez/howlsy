@@ -2,24 +2,17 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { mockProject } from "@/data/mock-project";
+import { createProjectFromIntake } from "@/lib/create-project";
 
 function GuidedContent() {
   const searchParams = useSearchParams();
 
-  const goal = searchParams.get("goal") ?? mockProject.goal;
-  const context = searchParams.get("context") ?? mockProject.context;
-  const experience = searchParams.get("experience") ?? mockProject.experience;
-  const constraints = searchParams.get("constraints") ?? mockProject.constraints;
-
-  const project = {
-    ...mockProject,
-    title: goal,
-    goal,
-    context,
-    experience,
-    constraints,
-  };
+  const project = createProjectFromIntake({
+    goal: searchParams.get("goal") ?? "",
+    context: searchParams.get("context") ?? "",
+    experience: searchParams.get("experience") ?? "",
+    constraints: searchParams.get("constraints") ?? "",
+  });
 
   const [currentStep, setCurrentStep] = useState(0);
   const [isComplete, setIsComplete] = useState(false);

@@ -2,25 +2,18 @@
 
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { mockProject } from "@/data/mock-project";
+import { createProjectFromIntake } from "@/lib/create-project";
 
 function ProjectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const goal = searchParams.get("goal") ?? mockProject.goal;
-  const context = searchParams.get("context") ?? mockProject.context;
-  const experience = searchParams.get("experience") ?? mockProject.experience;
-  const constraints = searchParams.get("constraints") ?? mockProject.constraints;
-
-  const project = {
-    ...mockProject,
-    title: goal,
-    goal,
-    context,
-    experience,
-    constraints,
-  };
+  const project = createProjectFromIntake({
+    goal: searchParams.get("goal") ?? "",
+    context: searchParams.get("context") ?? "",
+    experience: searchParams.get("experience") ?? "",
+    constraints: searchParams.get("constraints") ?? "",
+  });
 
   function handleStartGuidedMode() {
     const params = new URLSearchParams({
@@ -246,7 +239,7 @@ function ProjectContent() {
                   {step.order}
                 </div>
 
-                <div>
+                <div className="flex-1">
                   <h3 className="text-lg font-semibold">{step.title}</h3>
 
                   <p className="mt-2 leading-7 text-slate-300">
