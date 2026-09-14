@@ -49,6 +49,86 @@ const projectStatusLabels: Record<
   completed: "Completed",
 };
 
+/*
+ * Progress is derived from persisted completed step IDs instead of
+ * storing a separate percentage. This keeps the percentage consistent
+ * with the project's actual execution state.
+ */
+function getProjectProgress(project: HowlsyProject) {
+  const totalSteps = project.steps.length;
+
+  if (totalSteps === 0) {
+    return {
+      completedSteps: 0,
+      totalSteps: 0,
+      percentage: 0,
+    };
+  }
+
+  const validStepIds = new Set(
+    project.steps.map((step) => step.id)
+  );
+
+  const completedSteps = new Set(
+    project.progress.completedStepIds.filter((stepId) =>
+      validStepIds.has(stepId)
+    )
+  ).size;
+
+  return {
+    completedSteps,
+    totalSteps,
+    percentage: Math.round(
+      (completedSteps / totalSteps) * 100
+    ),
+  };
+}
+
+/*
+ * The saved current step gives the workspace a useful resume target.
+ * If no current step has been persisted yet, the first incomplete step
+ * becomes the next actionable step.
+ */
+function getResumeStep(project: HowlsyProject) {
+  if (project.status === "completed") {
+    return null;
+  }
+
+  const persistedCurrentStep = project.steps.find(
+    (step) => step.id === project.progress.currentStepId
+  );
+
+  if (persistedCurrentStep) {
+    return persistedCurrentStep;
+  }
+
+  const completedStepIds = new Set(
+    project.progress.completedStepIds
+  );
+
+  return (
+    project.steps.find(
+      (step) => !completedStepIds.has(step.id)
+    ) ?? project.steps[0] ?? null
+  );
+}
+
+function getProjectActionLabel(project: HowlsyProject) {
+  if (project.status === "completed") {
+    return "Review project";
+  }
+
+  if (
+    project.status === "in_progress" ||
+    project.progress.completedStepIds.length > 0 ||
+    project.progress.startedAt
+  ) {
+    return "Continue project";
+  }
+
+  return "Start project";
+}
+
 export default function Home() {
   const router = useRouter();
 
@@ -91,8 +171,25 @@ export default function Home() {
       return;
     }
 
-    router.push("/project");
+    if (savedProject.status === "completed") {
+      router.push("/project");
+      return;
+    }
+
+    router.push("/guided");
   }
+
+  const progress = savedProject
+    ? getProjectProgress(savedProject)
+    : null;
+
+  const resumeStep = savedProject
+    ? getResumeStep(savedProject)
+    : null;
+
+  const projectActionLabel = savedProject
+    ? getProjectActionLabel(savedProject)
+    : null;
 
   return (
     <main className="howlsy-background min-h-screen text-[var(--foreground)]">
@@ -233,27 +330,31 @@ export default function Home() {
 
               <h2 className="mt-2 text-xl font-semibold tracking-tight">
                 {savedProject
-                  ? "Continue where you left off"
+                  ? savedProject.status === "completed"
+                    ? "Your completed project"
+                    : "Continue where you left off"
                   : "Projects live here"}
               </h2>
             </div>
 
             <p className="max-w-md text-sm leading-6 text-[var(--foreground-muted)]">
               {savedProject
-                ? "Your current Howlsy project is saved on this device and ready when you are."
+                ? savedProject.status === "completed"
+                  ? "Your completed Howlsy project is saved on this device and ready to review."
+                  : "Your current Howlsy project is saved on this device and ready when you are."
                 : "Once you start building with Howlsy, your active project will appear here so you can pick up where you left off."}
             </p>
           </div>
 
-          {savedProject ? (
+          {savedProject && progress ? (
             <article className="howlsy-surface mt-6 overflow-hidden rounded-[var(--radius-large)]">
               <div className="flex flex-col gap-6 p-6 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex min-w-0 gap-4">
+                <div className="flex min-w-0 flex-1 gap-4">
                   <div className="hidden shrink-0 sm:block">
                     <HowlsyMark className="h-14 w-14" />
                   </div>
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full border border-[var(--border)] bg-[var(--surface-interactive)] px-2.5 py-1 text-xs font-medium text-[var(--accent)]">
                         {
@@ -275,6 +376,57 @@ export default function Home() {
                     <p className="mt-2 line-clamp-2 max-w-2xl text-sm leading-6 text-[var(--foreground-muted)]">
                       {savedProject.description}
                     </p>
+
+                    <div className="mt-5">
+                      <div className="flex items-center justify-between gap-4 text-xs">
+                        <span className="font-medium text-[var(--foreground-muted)]">
+                          {savedProject.status === "completed"
+                            ? "Project complete"
+                            : "Project progress"}
+                        </span>
+
+                        <span className="font-semibold text-[var(--foreground)]">
+                          {progress.percentage}%
+                        </span>
+                      </div>
+
+                      <div
+                        className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-interactive)]"
+                        role="progressbar"
+                        aria-label="Project progress"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress.percentage}
+                      >
+                        <div
+                          className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300"
+                          style={{
+                            width: `${progress.percentage}%`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--foreground-subtle)]">
+                        <span>
+                          {progress.completedSteps} of{" "}
+                          {progress.totalSteps} steps completed
+                        </span>
+
+                        {resumeStep ? (
+                          <span className="max-w-full truncate sm:max-w-[55%]">
+                            Next:{" "}
+                            <span className="text-[var(--foreground-muted)]">
+                              {resumeStep.title}
+                            </span>
+                          </span>
+                        ) : savedProject.status ===
+                          "completed" ? (
+                          <span className="text-[var(--foreground-muted)]">
+                            All steps completed
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
 
                     <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--foreground-subtle)]">
                       <span>
@@ -306,9 +458,7 @@ export default function Home() {
                   onClick={handleResumeProject}
                   className="flex shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-bold text-[var(--accent-foreground)] transition hover:bg-[var(--accent-bright)]"
                 >
-                  {savedProject.status === "completed"
-                    ? "View project"
-                    : "Resume project"}
+                  {projectActionLabel}
 
                   <span aria-hidden="true">→</span>
                 </button>
