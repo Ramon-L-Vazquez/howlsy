@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const exampleTasks = [
@@ -11,7 +12,20 @@ const exampleTasks = [
 ];
 
 export default function Home() {
+  const router = useRouter();
   const [goal, setGoal] = useState("");
+
+  function handleStart() {
+    const trimmedGoal = goal.trim();
+
+    if (!trimmedGoal) {
+      return;
+    }
+
+    const encodedGoal = encodeURIComponent(trimmedGoal);
+
+    router.push(`/intake?goal=${encodedGoal}`);
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -38,7 +52,9 @@ export default function Home() {
 
           <button
             type="button"
-            className="mt-4 w-full rounded-2xl bg-cyan-400 px-6 py-4 text-base font-semibold text-slate-950 transition hover:bg-cyan-300"
+            onClick={handleStart}
+            disabled={!goal.trim()}
+            className="mt-4 w-full rounded-2xl bg-cyan-400 px-6 py-4 text-base font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Get started
           </button>
