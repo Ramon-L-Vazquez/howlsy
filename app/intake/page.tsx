@@ -2,6 +2,8 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { createProjectFromIntake } from "@/lib/create-project";
+import { saveProject } from "@/lib/project-store";
 
 const questions = [
   {
@@ -76,14 +78,16 @@ function IntakeContent() {
   }
 
   function handleBuildPlan() {
-    const params = new URLSearchParams({
+    const project = createProjectFromIntake({
       goal: initialGoal,
       context: answers[0],
       experience: answers[1],
       constraints: answers[2],
     });
 
-    router.push(`/project?${params.toString()}`);
+    saveProject(project);
+
+    router.push("/project");
   }
 
   if (isComplete) {

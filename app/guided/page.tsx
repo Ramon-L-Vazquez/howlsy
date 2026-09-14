@@ -1,26 +1,38 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { createProjectFromIntake } from "@/lib/create-project";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getProject } from "@/lib/project-store";
+import type { HowlsyProject } from "@/types/project";
 
-function GuidedContent() {
-  const searchParams = useSearchParams();
+export default function GuidedPage() {
+  const router = useRouter();
 
-  const project = createProjectFromIntake({
-    goal: searchParams.get("goal") ?? "",
-    context: searchParams.get("context") ?? "",
-    experience: searchParams.get("experience") ?? "",
-    constraints: searchParams.get("constraints") ?? "",
-  });
-
+  const [project, setProject] = useState<HowlsyProject | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const step = project.steps[currentStep];
-  const progress = ((currentStep + 1) / project.steps.length) * 100;
+  useEffect(() => {
+    const storedProject = getProject();
+
+    setProject(storedProject);
+    setIsLoading(false);
+  }, []);
+
+  function handleBack() {
+    if (currentStep === 0) {
+      return;
+    }
+
+    setCurrentStep((previousStep) => previousStep - 1);
+  }
 
   function handleCompleteStep() {
+    if (!project) {
+      return;
+    }
+
     const isLastStep = currentStep === project.steps.length - 1;
 
     if (isLastStep) {
@@ -31,13 +43,48 @@ function GuidedContent() {
     setCurrentStep((previousStep) => previousStep + 1);
   }
 
-  function handleBack() {
-    if (currentStep === 0) {
-      return;
-    }
-
-    setCurrentStep((previousStep) => previousStep - 1);
+  function handleStartOver() {
+    router.push("/");
   }
+
+  if (isLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
+        <p className="text-slate-400">Loading project...</p>
+      </main>
+    );
+  }
+
+  if (!project) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white">
+        <section className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center px-6 py-16 text-center">
+          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-400">
+            Howlsy
+          </p>
+
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            No project found.
+          </h1>
+
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
+            Start a new project before entering guided mode.
+          </p>
+
+          <button
+            type="button"
+            onClick={handleStartOver}
+            className="mt-8 rounded-2xl bg-cyan-400 px-6 py-4 font-semibold text-slate-950 transition hover:bg-cyan-300"
+          >
+            Start a new project
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  const step = project.steps[currentStep];
+  const progress = ((currentStep + 1) / project.steps.length) * 100;
 
   if (isComplete) {
     return (
@@ -207,21 +254,5 @@ function GuidedContent() {
         </div>
       </section>
     </main>
-  );
-}
-
-function GuidedLoading() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
-      <p className="text-slate-400">Loading project...</p>
-    </main>
-  );
-}
-
-export default function GuidedPage() {
-  return (
-    <Suspense fallback={<GuidedLoading />}>
-      <GuidedContent />
-    </Suspense>
   );
 }
