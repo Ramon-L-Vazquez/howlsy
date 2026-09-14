@@ -1,8 +1,95 @@
 @import "tailwindcss";
 
+/*
+ * Howlsy Design System
+ * --------------------
+ * Global design tokens keep the product visually consistent while allowing
+ * individual experiences—projects, guided mode, diagrams, progress, and
+ * accessibility states—to share the same visual language.
+ */
+
 :root {
-  --background: #020617;
+  color-scheme: dark;
+
+  /* Core brand */
+  --howlsy-navy-950: #020617;
+  --howlsy-navy-900: #07111f;
+  --howlsy-navy-850: #0a1628;
+  --howlsy-navy-800: #0f1d32;
+
+  --howlsy-blue: #168cff;
+  --howlsy-cyan: #22d3ee;
+  --howlsy-cyan-bright: #67e8f9;
+
+  /* Surfaces */
+  --background: var(--howlsy-navy-950);
+  --surface: var(--howlsy-navy-900);
+  --surface-raised: var(--howlsy-navy-850);
+  --surface-interactive: var(--howlsy-navy-800);
+
+  /* Text */
   --foreground: #f8fafc;
+  --foreground-muted: #94a3b8;
+  --foreground-subtle: #64748b;
+
+  /* Borders */
+  --border: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.28);
+
+  /* Interactive */
+  --accent: var(--howlsy-cyan);
+  --accent-bright: var(--howlsy-cyan-bright);
+  --accent-secondary: var(--howlsy-blue);
+  --accent-foreground: #021018;
+
+  /* Semantic project states */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --info: #38bdf8;
+
+  /*
+   * Glow is deliberately subtle.
+   * Howlsy should feel cinematic, not like a neon gaming interface.
+   */
+  --accent-glow: rgba(34, 211, 238, 0.16);
+
+  --radius-small: 0.75rem;
+  --radius-medium: 1rem;
+  --radius-large: 1.5rem;
+  --radius-pill: 9999px;
+}
+
+/*
+ * Light mode is defined now even though the first branded interface will
+ * launch dark-first. Keeping semantic tokens here prevents components from
+ * depending directly on dark colors.
+ */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --background: #f8fafc;
+  --surface: #ffffff;
+  --surface-raised: #f1f5f9;
+  --surface-interactive: #e2e8f0;
+
+  --foreground: #0f172a;
+  --foreground-muted: #475569;
+  --foreground-subtle: #64748b;
+
+  --border: rgba(15, 23, 42, 0.1);
+  --border-strong: rgba(15, 23, 42, 0.18);
+
+  --accent: #0891b2;
+  --accent-bright: #06b6d4;
+  --accent-secondary: #2563eb;
+  --accent-foreground: #ffffff;
+
+  --accent-glow: rgba(8, 145, 178, 0.12);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html {
@@ -11,7 +98,100 @@ html {
 
 body {
   margin: 0;
+  min-height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/*
+ * Keyboard users must always be able to identify the active control.
+ */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/*
+ * Shared Howlsy cinematic background.
+ *
+ * The gradients are intentionally restrained so project imagery,
+ * diagrams, and instructional content remain the visual focus.
+ */
+.howlsy-background {
+  background:
+    radial-gradient(
+      circle at 50% -10%,
+      rgba(22, 140, 255, 0.12),
+      transparent 36rem
+    ),
+    radial-gradient(
+      circle at 85% 20%,
+      rgba(34, 211, 238, 0.06),
+      transparent 28rem
+    ),
+    var(--background);
+}
+
+/*
+ * Reusable elevated surface for cards, project panels, and navigation.
+ */
+.howlsy-surface {
+  border: 1px solid var(--border);
+  background: rgba(7, 17, 31, 0.78);
+  backdrop-filter: blur(18px);
+}
+
+/*
+ * Interactive surfaces receive a small amount of depth rather than
+ * dramatic shadows.
+ */
+.howlsy-interactive {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .howlsy-interactive:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-interactive);
+    transform: translateY(-1px);
+  }
+}
+
+/*
+ * Motion must never be required to understand Howlsy's interface.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
