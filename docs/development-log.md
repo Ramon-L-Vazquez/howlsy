@@ -1015,6 +1015,255 @@ As Howlsy grows, API, AI, persistence, and database boundaries should increasing
 
 ---
 
+---
+
+## 2026-09-14 — Rich Project Output Architecture and Type Narrowing Failure
+
+### Architecture Milestone
+
+Howlsy's original structured project contract was intentionally small while the core workflow was being established.
+
+A project step primarily contained:
+
+```text
+title
+instructions
+completion check
+warning
+```
+
+That structure was sufficient to prove the initial flow, but it was not rich enough for Howlsy's long-term product goal.
+
+Howlsy is intended to become an interactive manual that can combine detailed instructions with measurements, diagrams, blueprints, media, verified references, troubleshooting, accessibility information, and eventually product and part information.
+
+The project contract in:
+
+```text
+types/project.ts
+```
+
+was therefore expanded so the application can represent those concepts directly instead of attaching arbitrary AI prose to the UI.
+
+### Rich Project Contract
+
+The expanded model now supports step-level information including:
+
+```text
+summary
+estimated duration
+measurements
+specifications
+visual instructions
+resources
+products and parts
+troubleshooting branches
+accessibility information
+```
+
+Project-wide source records were also added. Supporting types now represent measurements, specifications, rich resources, product references, troubleshooting branches, visual instructions, and sources.
+
+Rich resources can represent images, illustrations, diagrams, blueprints, videos, audio, documents, products, parts, sources, interactive resources, and 3D resources.
+
+The model also distinguishes resource verification states:
+
+```text
+generated
+estimated
+unverified
+verified
+```
+
+This distinction prevents generated or estimated information from being presented as though it came from a verified manufacturer, code, government, or technical source.
+
+### AI Planning Boundary
+
+The AI project-generation route was expanded to generate planning metadata for measurements, specifications, visual requirements, troubleshooting branches, accessibility descriptions, step duration, tool quantities, and material specifications.
+
+The planning model is deliberately not treated as a retrieval system:
+
+```text
+User Intake
+    ↓
+AI Project Planning
+    ↓
+Structured HowlsyProject
+    ↓
+Visual / Resource Requirements
+    ↓
+Future Enrichment and Retrieval
+    ↓
+Verified Rich Resources
+```
+
+The planning layer may specify that a step needs a dimensioned blueprint and describe exactly what it should show, but it must not pretend that the blueprint has already been generated.
+
+Likewise, the planning endpoint must not fabricate product URLs, video URLs, manufacturer URLs, document URLs, citations, or verified compatibility claims.
+
+Actual media, products, parts, technical documents, and authoritative references will be supplied by later enrichment, retrieval, generation, and verification systems. Until then, generated planning data initializes unavailable resources as empty collections.
+
+### Persistence Migration
+
+Existing projects in browser `localStorage` were created before the rich fields existed. Simply requiring all new fields would make previously valid development projects unreadable.
+
+The persistence layer in:
+
+```text
+lib/project-store.ts
+```
+
+was therefore changed from a lightweight validator into a validation and migration boundary:
+
+```text
+localStorage
+    ↓
+JSON.parse()
+    ↓
+unknown runtime data
+    ↓
+validation
+    ↓
+legacy normalization
+    ↓
+current HowlsyProject
+    ↓
+save normalized shape
+    ↓
+application
+```
+
+Older valid steps receive safe defaults for measurements, specifications, visual instructions, resources, products, troubleshooting, and accessibility. Older projects also receive an empty `sources` collection.
+
+The normalized project is written back to browser storage so the migration does not repeat on every read. The earlier compatibility repair for the historical API response-envelope bug remains supported.
+
+### Build Failure
+
+After the richer persistence normalizer was implemented, `npm run build` compiled the application but TypeScript failed with `TS2322`.
+
+The errors affected:
+
+```text
+ProjectVisualInstruction[]
+ProjectResource[]
+ProjectSource[]
+```
+
+Representative failures reported that a generic `string` was not assignable to narrow unions such as:
+
+```text
+"illustration" | "diagram" | "blueprint" | "annotated_image" | "three_d"
+```
+
+Similar errors occurred for resource types and source types.
+
+### Cause
+
+Persisted data enters the normalizer as `unknown` and is narrowed into generic `Record<string, unknown>` records.
+
+The first implementation correctly performed runtime comparisons against allowed values. However, the reconstructed properties were still inferred by TypeScript as generic strings rather than the required literal unions.
+
+The runtime logic therefore knew the values were valid, while the compiler did not have enough type information to prove it.
+
+### Fix
+
+Dedicated TypeScript type guards were introduced:
+
+```ts
+isProjectVisualResourceType()
+isProjectResourceType()
+isProjectResourceVerificationStatus()
+isProjectSourceType()
+```
+
+These guards communicate both runtime validity and compile-time union types.
+
+Normalization was also separated into focused helpers:
+
+```ts
+normalizeProductReference()
+normalizeResource()
+normalizeVisualInstruction()
+normalizeSource()
+normalizeProjectStep()
+normalizeProject()
+```
+
+Malformed rich collections are rejected instead of silently accepted. Missing rich collections from legitimate older projects are migrated with safe defaults.
+
+### Verification
+
+After the type guards and persistence normalization were completed, the production build was run again:
+
+```bash
+npm run build
+```
+
+The build completed successfully:
+
+```text
+▲ Next.js 16.3.5 (Turbopack)
+
+Creating an optimized production build ...
+✓ Compiled successfully
+✓ Finished TypeScript
+✓ Collecting page data using 10 workers
+✓ Generating static pages using 10 workers (9/9)
+✓ Finalizing page optimization
+```
+
+The build included the static application routes and the dynamic `/api/projects/generate` endpoint.
+
+The engineering implementation was committed as:
+
+```text
+a06a5bb feat: establish rich project output architecture
+```
+
+### Result
+
+Howlsy's project model is no longer limited to a sequence of text instructions.
+
+The architecture can now evolve toward:
+
+```text
+User Goal
+    ↓
+Structured Project Plan
+    ↓
+Detailed Guided Steps
+    ↓
+Measurements + Specifications
+    ↓
+Illustrations + Diagrams + Blueprints
+    ↓
+Videos + Audio + Interactive Resources
+    ↓
+Products + Compatible Parts
+    ↓
+Verified Sources
+    ↓
+Adaptive Troubleshooting
+    ↓
+Accessible Guided Execution
+```
+
+The application also has a safer persistence boundary capable of migrating older project records while rejecting malformed rich data.
+
+Most importantly, rich-output planning and rich-resource fulfillment remain separate responsibilities. The planning model can specify what a user needs without falsely claiming that external information or media has already been retrieved or verified.
+
+### Technical Lesson
+
+Runtime validation and TypeScript narrowing are related but separate concerns.
+
+A runtime comparison may correctly reject invalid values while still failing to provide the compiler with enough information to infer a narrow union type. Explicit type guards allow the same validation rule to serve both runtime safety and compile-time correctness.
+
+This milestone also reinforced a broader Howlsy design principle:
+
+> Rich AI output should be structured around provenance and verification, not merely made more visually impressive.
+
+As Howlsy adds retrieval and enrichment systems, distinctions between requested, generated, estimated, retrieved, unverified, and verified information should remain part of the data architecture rather than being left to UI wording alone.
+
+---
+
 ## Development Principle
 
 Howlsy development follows a simple rule:
