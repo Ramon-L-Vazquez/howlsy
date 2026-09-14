@@ -440,7 +440,7 @@ Browser Project Store
         ↓
    getProject()
       ↙   ↘
-Project   Guided
+ Project  Guided
 ```
 
 Navigation is therefore now:
@@ -1015,8 +1015,6 @@ As Howlsy grows, API, AI, persistence, and database boundaries should increasing
 
 ---
 
----
-
 ## 2026-09-14 — Rich Project Output Architecture and Type Narrowing Failure
 
 ### Architecture Milestone
@@ -1044,6 +1042,8 @@ types/project.ts
 
 was therefore expanded so the application can represent those concepts directly instead of attaching arbitrary AI prose to the UI.
 
+---
+
 ### Rich Project Contract
 
 The expanded model now supports step-level information including:
@@ -1060,9 +1060,36 @@ troubleshooting branches
 accessibility information
 ```
 
-Project-wide source records were also added. Supporting types now represent measurements, specifications, rich resources, product references, troubleshooting branches, visual instructions, and sources.
+Project-wide source records were also added.
 
-Rich resources can represent images, illustrations, diagrams, blueprints, videos, audio, documents, products, parts, sources, interactive resources, and 3D resources.
+The supporting types include concepts for:
+
+```text
+ProjectMeasurement
+ProjectSpecification
+ProjectResource
+ProjectProductReference
+ProjectTroubleshootingBranch
+ProjectVisualInstruction
+ProjectSource
+```
+
+Rich resources can represent:
+
+```text
+images
+illustrations
+diagrams
+blueprints
+videos
+audio
+documents
+products
+parts
+sources
+interactive resources
+3D resources
+```
 
 The model also distinguishes resource verification states:
 
@@ -1073,13 +1100,31 @@ unverified
 verified
 ```
 
-This distinction prevents generated or estimated information from being presented as though it came from a verified manufacturer, code, government, or technical source.
+This distinction is important because Howlsy must not present generated or estimated information as though it came from a verified manufacturer, code, government, or technical source.
+
+---
 
 ### AI Planning Boundary
 
-The AI project-generation route was expanded to generate planning metadata for measurements, specifications, visual requirements, troubleshooting branches, accessibility descriptions, step duration, tool quantities, and material specifications.
+The AI project-generation route was expanded to generate the planning metadata required by the richer project contract.
 
-The planning model is deliberately not treated as a retrieval system:
+The route can now ask the planning model to identify:
+
+```text
+measurements
+technical specifications
+visual requirements
+likely troubleshooting branches
+accessibility descriptions
+step duration
+tool quantities
+material dimensions
+material specifications
+```
+
+However, the planning model is deliberately not treated as a retrieval system.
+
+The architecture follows:
 
 ```text
 User Intake
@@ -1095,15 +1140,64 @@ Future Enrichment and Retrieval
 Verified Rich Resources
 ```
 
-The planning layer may specify that a step needs a dimensioned blueprint and describe exactly what it should show, but it must not pretend that the blueprint has already been generated.
+For example, the planning layer may determine:
 
-Likewise, the planning endpoint must not fabricate product URLs, video URLs, manufacturer URLs, document URLs, citations, or verified compatibility claims.
+```text
+This step needs a dimensioned blueprint showing:
+- front view
+- side view
+- overall width
+- fastener locations
+- material labels
+```
 
-Actual media, products, parts, technical documents, and authoritative references will be supplied by later enrichment, retrieval, generation, and verification systems. Until then, generated planning data initializes unavailable resources as empty collections.
+but it must not pretend that the blueprint has already been generated.
+
+Likewise, the planning endpoint must not fabricate:
+
+```text
+product URLs
+video URLs
+manufacturer URLs
+document URLs
+citations
+verified compatibility claims
+```
+
+Actual images, diagrams, blueprints, videos, product records, parts, technical documents, and authoritative references will be supplied by later enrichment, retrieval, generation, and verification systems.
+
+For this reason, newly generated planning data currently initializes:
+
+```text
+resources: []
+products: []
+sources: []
+```
+
+when those resources have not actually been retrieved or generated.
+
+---
 
 ### Persistence Migration
 
-Existing projects in browser `localStorage` were created before the rich fields existed. Simply requiring all new fields would make previously valid development projects unreadable.
+Expanding the project contract created another requirement.
+
+Existing projects stored in browser `localStorage` were created before rich fields such as:
+
+```text
+measurements
+specifications
+visualInstructions
+resources
+products
+troubleshooting
+accessibility
+sources
+```
+
+existed.
+
+Simply requiring all new fields would cause previously valid development projects to become unreadable.
 
 The persistence layer in:
 
@@ -1111,7 +1205,9 @@ The persistence layer in:
 lib/project-store.ts
 ```
 
-was therefore changed from a lightweight validator into a validation and migration boundary:
+was therefore changed from a lightweight validator into a validation and migration boundary.
+
+The new flow is:
 
 ```text
 localStorage
@@ -1131,13 +1227,39 @@ save normalized shape
 application
 ```
 
-Older valid steps receive safe defaults for measurements, specifications, visual instructions, resources, products, troubleshooting, and accessibility. Older projects also receive an empty `sources` collection.
+Older valid project steps receive safe defaults such as:
 
-The normalized project is written back to browser storage so the migration does not repeat on every read. The earlier compatibility repair for the historical API response-envelope bug remains supported.
+```text
+measurements: []
+specifications: []
+visualInstructions: []
+resources: []
+products: []
+troubleshooting: []
+accessibility: {}
+```
+
+Older projects also receive:
+
+```text
+sources: []
+```
+
+The normalized project is immediately written back to browser storage so the migration does not need to be repeated on every read.
+
+The earlier compatibility repair for the historical API response-envelope bug remains supported as well.
+
+---
 
 ### Build Failure
 
-After the richer persistence normalizer was implemented, `npm run build` compiled the application but TypeScript failed with `TS2322`.
+After the richer persistence normalizer was implemented, the production build was run:
+
+```bash
+npm run build
+```
+
+The application compiled, but TypeScript failed with `TS2322`.
 
 The errors affected:
 
@@ -1147,25 +1269,67 @@ ProjectResource[]
 ProjectSource[]
 ```
 
-Representative failures reported that a generic `string` was not assignable to narrow unions such as:
+Representative failures reported that:
 
 ```text
-"illustration" | "diagram" | "blueprint" | "annotated_image" | "three_d"
+Type 'string' is not assignable to type
+'"illustration" | "diagram" | "blueprint" | "annotated_image" | "three_d"'
 ```
 
-Similar errors occurred for resource types and source types.
+and similar errors occurred for resource types and source types.
+
+---
 
 ### Cause
 
-Persisted data enters the normalizer as `unknown` and is narrowed into generic `Record<string, unknown>` records.
+Persisted data enters the normalizer as:
 
-The first implementation correctly performed runtime comparisons against allowed values. However, the reconstructed properties were still inferred by TypeScript as generic strings rather than the required literal unions.
+```ts
+unknown
+```
 
-The runtime logic therefore knew the values were valid, while the compiler did not have enough type information to prove it.
+and is narrowed into generic records:
+
+```ts
+Record<string, unknown>
+```
+
+The first implementation correctly performed runtime comparisons such as checking whether a visual resource type was:
+
+```text
+illustration
+diagram
+blueprint
+annotated_image
+three_d
+```
+
+However, the way those values were extracted and reconstructed did not preserve the narrower union type strongly enough for TypeScript.
+
+The runtime logic knew that an accepted value belonged to the allowed set, but the compiler still inferred the reconstructed property as a generic:
+
+```ts
+string
+```
+
+The same problem affected:
+
+```text
+visual resource types
+project resource types
+resource verification states
+project source types
+```
+
+This produced a mismatch between runtime validation and compile-time narrowing.
+
+---
 
 ### Fix
 
-Dedicated TypeScript type guards were introduced:
+Dedicated TypeScript type guards were introduced for the affected unions.
+
+These include:
 
 ```ts
 isProjectVisualResourceType()
@@ -1174,9 +1338,17 @@ isProjectResourceVerificationStatus()
 isProjectSourceType()
 ```
 
-These guards communicate both runtime validity and compile-time union types.
+Instead of merely comparing a value and later expecting TypeScript to infer the correct union, each guard explicitly communicates both facts:
 
-Normalization was also separated into focused helpers:
+```text
+runtime:
+the value belongs to the allowed set
+
+compile time:
+the value has the corresponding union type
+```
+
+Normalization was also separated into focused helpers including:
 
 ```ts
 normalizeProductReference()
@@ -1187,11 +1359,17 @@ normalizeProjectStep()
 normalizeProject()
 ```
 
-Malformed rich collections are rejected instead of silently accepted. Missing rich collections from legitimate older projects are migrated with safe defaults.
+This makes the persistence boundary easier to reason about and prevents broad type assertions from bypassing validation.
+
+Malformed rich collections are rejected rather than silently accepted.
+
+Missing rich collections from legitimate older projects, however, are still migrated with safe defaults.
+
+---
 
 ### Verification
 
-After the type guards and persistence normalization were completed, the production build was run again:
+After adding the dedicated type guards and completing the persistence normalization changes, the production build was run again:
 
 ```bash
 npm run build
@@ -1210,13 +1388,27 @@ Creating an optimized production build ...
 ✓ Finalizing page optimization
 ```
 
-The build included the static application routes and the dynamic `/api/projects/generate` endpoint.
+The resulting application routes included:
+
+```text
+/
+/_not-found
+ƒ /api/projects/generate
+/guided
+/icon.svg
+/intake
+/project
+```
+
+This verified that the expanded project contract, AI planning route, mock project, persistence migration, runtime validation, and TypeScript union types all compiled together successfully.
 
 The engineering implementation was committed as:
 
 ```text
 a06a5bb feat: establish rich project output architecture
 ```
+
+---
 
 ### Result
 
@@ -1248,19 +1440,36 @@ Accessible Guided Execution
 
 The application also has a safer persistence boundary capable of migrating older project records while rejecting malformed rich data.
 
-Most importantly, rich-output planning and rich-resource fulfillment remain separate responsibilities. The planning model can specify what a user needs without falsely claiming that external information or media has already been retrieved or verified.
+Most importantly, rich-output planning and rich-resource fulfillment remain separate responsibilities.
+
+The planning model can specify what a user needs to understand without falsely claiming that external information or media has already been retrieved or verified.
+
+---
 
 ### Technical Lesson
 
 Runtime validation and TypeScript narrowing are related but separate concerns.
 
-A runtime comparison may correctly reject invalid values while still failing to provide the compiler with enough information to infer a narrow union type. Explicit type guards allow the same validation rule to serve both runtime safety and compile-time correctness.
+A runtime comparison may correctly reject invalid values while still failing to provide the compiler with enough information to infer a narrow union type.
+
+Explicit type guards allow the same validation rule to serve both runtime safety and compile-time correctness.
 
 This milestone also reinforced a broader Howlsy design principle:
 
 > Rich AI output should be structured around provenance and verification, not merely made more visually impressive.
 
-As Howlsy adds retrieval and enrichment systems, distinctions between requested, generated, estimated, retrieved, unverified, and verified information should remain part of the data architecture rather than being left to UI wording alone.
+Adding fields for diagrams, products, sources, and compatibility is only useful if the application can distinguish:
+
+```text
+requested
+generated
+estimated
+retrieved
+unverified
+verified
+```
+
+As Howlsy adds retrieval and enrichment systems, those trust distinctions should remain part of the data architecture rather than being left to UI wording alone.
 
 ---
 
