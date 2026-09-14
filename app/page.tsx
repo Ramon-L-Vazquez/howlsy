@@ -2,8 +2,14 @@
 
 import { HowlsyLogo } from "@/components/brand/howlsy-logo";
 import { HowlsyMark } from "@/components/brand/howlsy-mark";
+import { getProject } from "@/lib/project-store";
+import type { HowlsyProject } from "@/types/project";
 import { useRouter } from "next/navigation";
-import { KeyboardEvent, useState } from "react";
+import {
+  KeyboardEvent,
+  useEffect,
+  useState,
+} from "react";
 
 const exampleTasks = [
   {
@@ -33,9 +39,31 @@ const exampleTasks = [
   },
 ];
 
+const projectStatusLabels: Record<
+  HowlsyProject["status"],
+  string
+> = {
+  draft: "Draft",
+  ready: "Ready",
+  in_progress: "In progress",
+  completed: "Completed",
+};
+
 export default function Home() {
   const router = useRouter();
+
   const [goal, setGoal] = useState("");
+  const [savedProject, setSavedProject] =
+    useState<HowlsyProject | null>(null);
+
+  /*
+   * Project persistence currently lives in browser localStorage.
+   * Reading it after mount keeps browser-only storage access out of
+   * the server-rendering path.
+   */
+  useEffect(() => {
+    setSavedProject(getProject());
+  }, []);
 
   function handleStart() {
     const trimmedGoal = goal.trim();
@@ -44,14 +72,26 @@ export default function Home() {
       return;
     }
 
-    router.push(`/intake?goal=${encodeURIComponent(trimmedGoal)}`);
+    router.push(
+      `/intake?goal=${encodeURIComponent(trimmedGoal)}`
+    );
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>
+  ) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       handleStart();
     }
+  }
+
+  function handleResumeProject() {
+    if (!savedProject) {
+      return;
+    }
+
+    router.push("/project");
   }
 
   return (
@@ -62,6 +102,14 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => {
+              document
+                .getElementById("workspace")
+                ?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+            }}
             className="howlsy-interactive hidden rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-medium text-[var(--foreground-muted)] sm:block"
           >
             My projects
@@ -97,22 +145,27 @@ export default function Home() {
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-7 text-[var(--foreground-muted)] sm:text-lg">
-            Tell Howlsy what you want to build, fix, install, learn, or
-            accomplish. We&apos;ll figure out what you need and guide you
-            through it step by step.
+            Tell Howlsy what you want to build, fix, install,
+            learn, or accomplish. We&apos;ll figure out what you
+            need and guide you through it step by step.
           </p>
         </div>
 
         <div className="mt-10 w-full max-w-3xl">
           <div className="howlsy-surface overflow-hidden rounded-[var(--radius-large)] shadow-2xl shadow-black/20">
-            <label htmlFor="howlsy-goal" className="sr-only">
+            <label
+              htmlFor="howlsy-goal"
+              className="sr-only"
+            >
               What do you want to do?
             </label>
 
             <textarea
               id="howlsy-goal"
               value={goal}
-              onChange={(event) => setGoal(event.target.value)}
+              onChange={(event) =>
+                setGoal(event.target.value)
+              }
               onKeyDown={handleKeyDown}
               className="min-h-36 w-full resize-none bg-transparent px-5 pb-4 pt-5 text-base leading-7 text-[var(--foreground)] outline-none placeholder:text-[var(--foreground-subtle)] sm:min-h-40 sm:px-6 sm:pt-6 sm:text-lg"
               placeholder="I want to..."
@@ -148,7 +201,9 @@ export default function Home() {
               <button
                 key={task.label}
                 type="button"
-                onClick={() => setGoal(task.prompt)}
+                onClick={() =>
+                  setGoal(task.prompt)
+                }
                 className="howlsy-interactive group flex min-h-24 flex-col items-start justify-between rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface)] p-4 text-left"
               >
                 <span
@@ -166,7 +221,10 @@ export default function Home() {
           </div>
         </div>
 
-        <section className="mt-16 w-full max-w-5xl border-t border-[var(--border)] pt-8">
+        <section
+          id="workspace"
+          className="mt-16 w-full max-w-5xl scroll-mt-8 border-t border-[var(--border)] pt-8"
+        >
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
@@ -174,27 +232,112 @@ export default function Home() {
               </p>
 
               <h2 className="mt-2 text-xl font-semibold tracking-tight">
-                Projects live here
+                {savedProject
+                  ? "Continue where you left off"
+                  : "Projects live here"}
               </h2>
             </div>
 
             <p className="max-w-md text-sm leading-6 text-[var(--foreground-muted)]">
-              Once you start building with Howlsy, active and completed
-              projects will be available here so you can pick up where you
-              left off.
+              {savedProject
+                ? "Your current Howlsy project is saved on this device and ready when you are."
+                : "Once you start building with Howlsy, your active project will appear here so you can pick up where you left off."}
             </p>
           </div>
 
-          <div className="mt-6 rounded-[var(--radius-large)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)]/50 px-6 py-10 text-center">
-            <HowlsyMark className="mx-auto h-12 w-12 opacity-70" />
+          {savedProject ? (
+            <article className="howlsy-surface mt-6 overflow-hidden rounded-[var(--radius-large)]">
+              <div className="flex flex-col gap-6 p-6 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 gap-4">
+                  <div className="hidden shrink-0 sm:block">
+                    <HowlsyMark className="h-14 w-14" />
+                  </div>
 
-            <h3 className="mt-4 font-semibold">Your first project starts above.</h3>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-[var(--border)] bg-[var(--surface-interactive)] px-2.5 py-1 text-xs font-medium text-[var(--accent)]">
+                        {
+                          projectStatusLabels[
+                            savedProject.status
+                          ]
+                        }
+                      </span>
 
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--foreground-muted)]">
-              Describe what you want to accomplish and Howlsy will turn it
-              into a guided project you can work through.
-            </p>
-          </div>
+                      <span className="text-xs text-[var(--foreground-subtle)]">
+                        {savedProject.category}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">
+                      {savedProject.title}
+                    </h3>
+
+                    <p className="mt-2 line-clamp-2 max-w-2xl text-sm leading-6 text-[var(--foreground-muted)]">
+                      {savedProject.description}
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--foreground-subtle)]">
+                      <span>
+                        Difficulty:{" "}
+                        <strong className="font-medium text-[var(--foreground-muted)]">
+                          {savedProject.difficulty}
+                        </strong>
+                      </span>
+
+                      <span>
+                        Time:{" "}
+                        <strong className="font-medium text-[var(--foreground-muted)]">
+                          {savedProject.estimatedDuration}
+                        </strong>
+                      </span>
+
+                      <span>
+                        Steps:{" "}
+                        <strong className="font-medium text-[var(--foreground-muted)]">
+                          {savedProject.steps.length}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleResumeProject}
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-bold text-[var(--accent-foreground)] transition hover:bg-[var(--accent-bright)]"
+                >
+                  {savedProject.status === "completed"
+                    ? "View project"
+                    : "Resume project"}
+
+                  <span aria-hidden="true">→</span>
+                </button>
+              </div>
+
+              <div className="border-t border-[var(--border)] bg-[var(--surface-raised)]/40 px-6 py-4 sm:px-7">
+                <p className="truncate text-xs text-[var(--foreground-subtle)]">
+                  Goal:{" "}
+                  <span className="text-[var(--foreground-muted)]">
+                    {savedProject.goal}
+                  </span>
+                </p>
+              </div>
+            </article>
+          ) : (
+            <div className="mt-6 rounded-[var(--radius-large)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)]/50 px-6 py-10 text-center">
+              <HowlsyMark className="mx-auto h-12 w-12 opacity-70" />
+
+              <h3 className="mt-4 font-semibold">
+                Your first project starts above.
+              </h3>
+
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--foreground-muted)]">
+                Describe what you want to accomplish and
+                Howlsy will turn it into a guided project
+                you can work through.
+              </p>
+            </div>
+          )}
         </section>
       </section>
 
