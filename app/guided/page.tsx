@@ -2,47 +2,33 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-
-const guidedSteps = [
-  {
-    title: "Review the goal and constraints",
-    instructions:
-      "Read through the project goal and the information you provided. Make sure the plan still matches what you are trying to accomplish before moving forward.",
-    check:
-      "Confirm that the goal, limitations, and expectations are accurate.",
-  },
-  {
-    title: "Gather the required tools and materials",
-    instructions:
-      "Collect the tools, materials, and safety equipment needed for the task. Keep everything within reach before you begin.",
-    check:
-      "Confirm that you have everything required to start safely.",
-  },
-  {
-    title: "Begin the project",
-    instructions:
-      "Start the first hands-on part of the task. Work carefully and complete only this step before moving forward.",
-    check:
-      "Confirm that this stage is complete and nothing unexpected happened.",
-  },
-];
+import { mockProject } from "@/data/mock-project";
 
 function GuidedContent() {
   const searchParams = useSearchParams();
 
-  const goal = searchParams.get("goal") ?? "Untitled project";
-  const context = searchParams.get("context") ?? "";
-  const experience = searchParams.get("experience") ?? "";
-  const constraints = searchParams.get("constraints") ?? "";
+  const goal = searchParams.get("goal") ?? mockProject.goal;
+  const context = searchParams.get("context") ?? mockProject.context;
+  const experience = searchParams.get("experience") ?? mockProject.experience;
+  const constraints = searchParams.get("constraints") ?? mockProject.constraints;
+
+  const project = {
+    ...mockProject,
+    title: goal,
+    goal,
+    context,
+    experience,
+    constraints,
+  };
 
   const [currentStep, setCurrentStep] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
-  const step = guidedSteps[currentStep];
-  const progress = ((currentStep + 1) / guidedSteps.length) * 100;
+  const step = project.steps[currentStep];
+  const progress = ((currentStep + 1) / project.steps.length) * 100;
 
   function handleCompleteStep() {
-    const isLastStep = currentStep === guidedSteps.length - 1;
+    const isLastStep = currentStep === project.steps.length - 1;
 
     if (isLastStep) {
       setIsComplete(true);
@@ -80,7 +66,9 @@ function GuidedContent() {
             You&apos;ve completed every guided step for:
           </p>
 
-          <p className="mt-4 text-2xl font-semibold text-white">{goal}</p>
+          <p className="mt-4 text-2xl font-semibold text-white">
+            {project.title}
+          </p>
 
           <button
             type="button"
@@ -106,14 +94,14 @@ function GuidedContent() {
           </p>
 
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            {goal}
+            {project.title}
           </h1>
         </div>
 
         <div className="mb-10">
           <div className="flex items-center justify-between text-sm text-slate-400">
             <span>
-              Step {currentStep + 1} of {guidedSteps.length}
+              Step {currentStep + 1} of {project.steps.length}
             </span>
 
             <span>{Math.round(progress)}% complete</span>
@@ -128,9 +116,15 @@ function GuidedContent() {
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8">
-          <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
-            Current step
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
+              Current step
+            </p>
+
+            <span className="text-sm text-slate-500">
+              {step.order} / {project.steps.length}
+            </span>
+          </div>
 
           <h2 className="mt-3 text-3xl font-bold">{step.title}</h2>
 
@@ -143,8 +137,20 @@ function GuidedContent() {
               Before continuing
             </p>
 
-            <p className="mt-2 leading-7 text-slate-200">{step.check}</p>
+            <p className="mt-2 leading-7 text-slate-200">
+              {step.completionCheck}
+            </p>
           </div>
+
+          {step.warning && (
+            <div className="mt-5 rounded-2xl border border-amber-900/60 bg-amber-950/20 p-5">
+              <p className="text-sm font-semibold uppercase tracking-wider text-amber-400">
+                Warning
+              </p>
+
+              <p className="mt-2 leading-7 text-slate-300">{step.warning}</p>
+            </div>
+          )}
         </div>
 
         <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
@@ -156,24 +162,34 @@ function GuidedContent() {
             <div>
               <p className="text-sm text-slate-500">Details</p>
               <p className="mt-1 text-slate-300">
-                {context || "No additional details provided."}
+                {project.context || "No additional details provided."}
               </p>
             </div>
 
             <div>
               <p className="text-sm text-slate-500">Experience</p>
               <p className="mt-1 text-slate-300">
-                {experience || "Not provided."}
+                {project.experience || "Not provided."}
               </p>
             </div>
 
             <div>
               <p className="text-sm text-slate-500">Constraints</p>
               <p className="mt-1 text-slate-300">
-                {constraints || "No constraints provided."}
+                {project.constraints || "No constraints provided."}
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-amber-900/60 bg-amber-950/20 p-6">
+          <p className="text-sm font-semibold uppercase tracking-wider text-amber-400">
+            Safety reminder
+          </p>
+
+          <p className="mt-3 leading-7 text-slate-300">
+            {project.safety.summary}
+          </p>
         </div>
 
         <div className="mt-8 flex gap-3">
@@ -191,7 +207,7 @@ function GuidedContent() {
             onClick={handleCompleteStep}
             className="flex-1 rounded-2xl bg-cyan-400 px-6 py-4 font-semibold text-slate-950 transition hover:bg-cyan-300"
           >
-            {currentStep === guidedSteps.length - 1
+            {currentStep === project.steps.length - 1
               ? "Complete project"
               : "Complete step"}
           </button>
