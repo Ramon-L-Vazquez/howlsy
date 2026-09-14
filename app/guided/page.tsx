@@ -1,7 +1,7 @@
 "use client";
 
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
 
 const guidedSteps = [
   {
@@ -27,7 +27,7 @@ const guidedSteps = [
   },
 ];
 
-export default function GuidedPage() {
+function GuidedContent() {
   const searchParams = useSearchParams();
 
   const goal = searchParams.get("goal") ?? "Untitled project";
@@ -198,5 +198,21 @@ export default function GuidedPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+function GuidedLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
+      <p className="text-slate-400">Loading project...</p>
+    </main>
+  );
+}
+
+export default function GuidedPage() {
+  return (
+    <Suspense fallback={<GuidedLoading />}>
+      <GuidedContent />
+    </Suspense>
   );
 }

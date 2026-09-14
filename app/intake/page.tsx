@@ -1,7 +1,7 @@
 "use client";
 
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
 
 const questions = [
   {
@@ -24,7 +24,7 @@ const questions = [
   },
 ];
 
-export default function IntakePage() {
+function IntakeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -215,5 +215,21 @@ export default function IntakePage() {
         </div>
       </section>
     </main>
+  );
+}
+
+function IntakeLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
+      <p className="text-slate-400">Loading intake...</p>
+    </main>
+  );
+}
+
+export default function IntakePage() {
+  return (
+    <Suspense fallback={<IntakeLoading />}>
+      <IntakeContent />
+    </Suspense>
   );
 }

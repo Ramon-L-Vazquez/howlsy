@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const projectSteps = [
@@ -28,7 +29,7 @@ const materials = [
   "Consumable supplies",
 ];
 
-export default function ProjectPage() {
+function ProjectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -205,5 +206,21 @@ export default function ProjectPage() {
         </button>
       </section>
     </main>
+  );
+}
+
+function ProjectLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
+      <p className="text-slate-400">Loading project...</p>
+    </main>
+  );
+}
+
+export default function ProjectPage() {
+  return (
+    <Suspense fallback={<ProjectLoading />}>
+      <ProjectContent />
+    </Suspense>
   );
 }
