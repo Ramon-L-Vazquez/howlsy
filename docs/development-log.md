@@ -2466,6 +2466,233 @@ Howlsy now bases completion on explicit completed-step records rather than scree
 
 ## Development Principle**
 
+## 2026-09-15 — Mobile Development Hydration Failure on Local Network
+
+### Problem
+
+Howlsy was tested from a phone connected to the same local Wi-Fi network as the development computer.
+
+The Next.js development server was started with:
+
+```bash
+npm run dev -- --hostname 0.0.0.0
+```
+
+The application successfully rendered on the phone through the development computer's LAN address, but React-driven controls did not work correctly.
+
+Observed behavior included:
+
+```text
+page renders successfully
+textarea accepts typed text
+Continue button remains disabled
+React-driven state does not update
+interactive controls do not respond correctly
+```
+
+A GitHub issue was opened to track the incident:
+
+```text
+Issue #1
+Mobile development build renders but does not hydrate over local network
+```
+
+---
+
+### Investigation
+
+The network connection itself was working because the phone could request and render Howlsy.
+
+The Next.js development terminal reported:
+
+```text
+Blocked cross-origin request to Next.js dev resource /_next/hmr from "192.168.1.127".
+
+Cross-origin access to Next.js dev resources is blocked by default for safety.
+```
+
+Next.js indicated that the LAN address needed to be included in `allowedDevOrigins`.
+
+This narrowed the failure from application UI logic to development-resource access and client hydration.
+
+---
+
+### Cause
+
+The HTML document was accessible over the local network, allowing the browser to render the visible application.
+
+However, Next.js blocked development resources requested through the LAN address because that origin was not allowed.
+
+The failure path was:
+
+```text
+phone requests page
+    ↓
+Next.js returns HTML
+    ↓
+browser renders interface
+    ↓
+development resources are blocked
+    ↓
+React does not fully hydrate
+    ↓
+native HTML behavior remains
+    ↓
+React-controlled interaction does not work
+```
+
+This explains why the textarea could accept text while the React-controlled Continue button remained disabled.
+
+---
+
+### Fix
+
+`next.config.ts` was updated to allow the development computer's LAN origin:
+
+```ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /*
+   * Allow Howlsy's development client to load Next.js development
+   * resources when testing the application from another device on the
+   * same local network.
+   *
+   * Without this entry, Next.js blocks development resources requested
+   * through the computer's LAN address. The HTML can still render on a
+   * phone, but React cannot fully hydrate, leaving interactive controls
+   * such as buttons disabled or unresponsive.
+   *
+   * This setting affects the development environment only. Production
+   * deployments will use their normal application origin.
+   */
+  allowedDevOrigins: ["192.168.1.127"],
+};
+
+export default nextConfig;
+```
+
+The development server was restarted after the configuration change.
+
+The fix was committed as:
+
+```text
+1da3667 fix: allow mobile development over local network
+```
+
+The commit includes:
+
+```text
+Closes #1
+```
+
+This links the implementation directly to GitHub Issue #1. The issue will close when the commit containing the closing reference is pushed to the repository's default branch.
+
+---
+
+### Mobile Verification
+
+After restarting the development server, Howlsy was reopened from the phone.
+
+Verification results:
+
+```text
+application loads on phone
+textarea accepts input
+React state updates
+Continue button enables after typing
+Continue button responds to tap
+navigation works
+interactive controls function normally
+```
+
+The original failure was no longer reproducible.
+
+---
+
+### Production Build Verification
+
+After mobile verification, a production build was run:
+
+```bash
+npm run build
+```
+
+The build completed successfully:
+
+```text
+▲ Next.js 16.3.5 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 27ms
+
+Creating an optimized production build ...
+✓ Compiled successfully in 952ms
+✓ Finished TypeScript in 1669ms
+✓ Collecting page data using 10 workers in 909ms
+✓ Generating static pages using 10 workers (9/9) in 791ms
+✓ Finalizing page optimization in 22ms
+```
+
+The generated routes included:
+
+```text
+/
+├ ○ /_not-found
+├ ƒ /api/projects/generate
+├ ○ /guided
+├ ○ /icon.svg
+├ ○ /intake
+└ ○ /project
+```
+
+This verified that the development-origin configuration did not introduce a production build or TypeScript regression.
+
+---
+
+### Result
+
+Howlsy can now be tested interactively from another device on the same local network during development.
+
+The incident has a traceable engineering path:
+
+```text
+reported symptom
+    ↓
+reproduction
+    ↓
+GitHub Issue #1
+    ↓
+diagnostic evidence
+    ↓
+root cause
+    ↓
+code fix
+    ↓
+mobile verification
+    ↓
+production verification
+    ↓
+commit linked to issue
+```
+
+This preserves both the implementation history in Git and the reasoning behind the fix in the development log.
+
+---
+
+### Technical Lesson
+
+A page rendering successfully does not prove that a client-side application has hydrated successfully.
+
+Server-rendered HTML can make an application appear functional even when the JavaScript required for client-side state and event handling has failed to load.
+
+Native browser controls can also produce misleading signs of functionality. In this incident, the textarea could accept typed text even though React was not successfully controlling the application state.
+
+When testing a Next.js development build from another device, verification should therefore include both network accessibility and successful client hydration.
+
+This incident also reinforced the value of reading framework diagnostics before modifying application logic. The Howlsy intake logic was functioning correctly; the failure existed at the development-server boundary.
+
+---
+
 Howlsy development follows a simple rule:
 
 > Build the application in small, verifiable milestones and preserve the reasoning behind meaningful technical decisions.
