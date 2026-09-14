@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 const questions = [
@@ -25,7 +25,9 @@ const questions = [
 ];
 
 export default function IntakePage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+
   const initialGoal = searchParams.get("goal") ?? "";
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -71,6 +73,17 @@ export default function IntakePage() {
   function handleEditAnswers() {
     setCurrentQuestion(0);
     setIsComplete(false);
+  }
+
+  function handleBuildPlan() {
+    const params = new URLSearchParams({
+      goal: initialGoal,
+      context: answers[0],
+      experience: answers[1],
+      constraints: answers[2],
+    });
+
+    router.push(`/project?${params.toString()}`);
   }
 
   if (isComplete) {
@@ -125,6 +138,7 @@ export default function IntakePage() {
 
             <button
               type="button"
+              onClick={handleBuildPlan}
               className="rounded-2xl bg-cyan-400 px-6 py-4 font-semibold text-slate-950 transition hover:bg-cyan-300"
             >
               Build my plan
