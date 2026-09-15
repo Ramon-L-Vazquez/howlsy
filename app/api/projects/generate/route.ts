@@ -1046,6 +1046,14 @@ ${constraints || "No constraints provided."}
             })),
 
           /*
+           * Resource requests belong to Howlsy's enrichment pipeline.
+           * The current planning endpoint does not retrieve or generate
+           * external resources, so new steps begin with no fulfilled
+           * enrichment requests.
+           */
+          resourceRequests: [],
+
+          /*
            * Actual rich resources are attached by later enrichment
            * systems. The planning model describes what should exist
            * without pretending that media has already been generated
@@ -1059,6 +1067,20 @@ ${constraints || "No constraints provided."}
            * must not invent purchasable items or URLs.
            */
           products: [],
+
+          /*
+           * Retailer offers are time-sensitive retrieval results.
+           * The planning endpoint has no live retailer or inventory
+           * access, so it must never fabricate offer records.
+           */
+          productOffers: [],
+
+          /*
+           * Actions are created only after Howlsy has enough real
+           * context to offer a safe next action. Creating a project
+           * must not imply user authorization for an external action.
+           */
+          actions: [],
 
           troubleshooting:
             step.troubleshooting.map(

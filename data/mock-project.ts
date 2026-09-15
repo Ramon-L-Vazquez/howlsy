@@ -143,9 +143,15 @@ export const mockProject: HowlsyProject = {
         },
       ],
 
+      resourceRequests: [],
+
       resources: [],
 
       products: [],
+
+      productOffers: [],
+
+      actions: [],
 
       troubleshooting: [
         {
@@ -243,9 +249,15 @@ export const mockProject: HowlsyProject = {
         },
       ],
 
+      resourceRequests: [],
+
       resources: [],
 
       products: [],
+
+      productOffers: [],
+
+      actions: [],
 
       troubleshooting: [
         {
@@ -380,9 +392,15 @@ export const mockProject: HowlsyProject = {
         },
       ],
 
+      resourceRequests: [],
+
       resources: [],
 
       products: [],
+
+      productOffers: [],
+
+      actions: [],
 
       troubleshooting: [
         {

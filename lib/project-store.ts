@@ -80,6 +80,7 @@ function isProjectResourceType(
     value === "illustration" ||
     value === "diagram" ||
     value === "blueprint" ||
+    value === "annotated_image" ||
     value === "video" ||
     value === "audio" ||
     value === "document" ||
@@ -97,6 +98,8 @@ function isProjectResourceVerificationStatus(
   return (
     value === "generated" ||
     value === "estimated" ||
+    value === "requested" ||
+    value === "retrieved" ||
     value === "unverified" ||
     value === "verified"
   );
@@ -350,6 +353,11 @@ function normalizeSource(
  * Earlier Howlsy projects only contained the basic instructional
  * fields. Rich project fields are added with safe empty defaults when
  * loading legacy browser data.
+ *
+ * Resource requests, retailer offers, and executable actions were added
+ * later as part of the Resource & Action Engine contract. Legacy
+ * projects therefore receive empty application-owned collections
+ * rather than fabricated enrichment, commerce, or authorization state.
  */
 function normalizeProjectStep(
   value: unknown,
@@ -507,6 +515,27 @@ function normalizeProjectStep(
     }
   }
 
+  /*
+   * These collections are intentionally application-owned.
+   *
+   * Existing persisted projects predate the Resource & Action Engine,
+   * so absence of these properties is a valid legacy state. Migrating
+   * them to empty arrays means "nothing has been requested, retrieved,
+   * offered, or authorized yet."
+   *
+   * We deliberately do not infer these records from AI text, product
+   * references, visual instructions, or other legacy fields because
+   * doing so could falsely imply retrieval, availability, compatibility,
+   * or authorization.
+   */
+  const resourceRequests: ProjectStep["resourceRequests"] =
+    [];
+
+  const productOffers: ProjectStep["productOffers"] =
+    [];
+
+  const actions: ProjectStep["actions"] = [];
+
   const troubleshooting: ProjectStep["troubleshooting"] =
     [];
 
@@ -603,9 +632,15 @@ function normalizeProjectStep(
 
     visualInstructions,
 
+    resourceRequests,
+
     resources,
 
     products,
+
+    productOffers,
+
+    actions,
 
     troubleshooting,
 
@@ -970,8 +1005,8 @@ export function saveProject(
  *
  * Current projects are validated and normalized before being returned.
  * Older project contracts are migrated forward by supplying safe
- * defaults for rich project fields and progress state that did not
- * previously exist.
+ * defaults for rich project fields, Resource & Action Engine state, and
+ * progress state that did not previously exist.
  *
  * Projects accidentally stored inside the old API response envelope
  * are also repaired.

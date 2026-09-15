@@ -2693,6 +2693,445 @@ This incident also reinforced the value of reading framework diagnostics before 
 
 ---
 
+## Resource and Action Schema Migration — GitHub Issue #2
+
+### Problem
+
+Howlsy's project architecture was expanded to support the next stage of the Resource and Action Engine.
+
+The `ProjectStep` contract gained three required application-owned collections:
+
+- `resourceRequests`
+- `productOffers`
+- `actions`
+
+The broader project model was also expanded with contracts for resource provenance and retrieval state, retailer product offers, resource requests, and explicitly authorized real-world actions.
+
+After strengthening the TypeScript contract, the production build failed during type checking.
+
+The relevant errors included:
+
+TS2322 in:
+
+app/api/projects/generate/route.ts
+
+and TS2739 in:
+
+data/mock-project.ts
+lib/project-store.ts
+
+Existing `ProjectStep` construction boundaries still produced the previous schema and therefore did not contain:
+
+resourceRequests
+productOffers
+actions
+
+The failure was captured as GitHub Issue #2:
+
+ProjectStep resource/action schema migration breaks production type check
+
+The issue was labeled:
+
+bug
+architecture
+typescript
+data-migration
+
+---
+
+### Why the Build Failure Was Useful
+
+The new fields were intentionally required rather than optional.
+
+Making them optional merely to silence TypeScript would have weakened the project contract and allowed different parts of Howlsy to disagree about what a valid `ProjectStep` contains.
+
+The compiler instead exposed every integration boundary that still depended on the previous schema.
+
+The initial production build identified three categories of affected code:
+
+1. AI-generated project construction
+
+2. development mock-project construction
+
+3. persisted-project normalization and migration
+
+This demonstrated one of the reasons Howlsy uses strong structured contracts between its planning, persistence, retrieval, commerce, and action layers.
+
+---
+
+### Architectural Boundary
+
+The migration also established an important separation between several kinds of state.
+
+Howlsy must distinguish:
+
+PLAN
+    ↓
+REQUEST
+    ↓
+RETRIEVE
+    ↓
+VERIFY
+    ↓
+RESOURCE
+    ↓
+FIND
+    ↓
+OFFER
+    ↓
+ACT
+    ↓
+AUTHORIZE
+    ↓
+EXECUTE
+
+These states must not collapse into one another.
+
+A planning model describing a useful resource does not mean the resource has been retrieved.
+
+A product requirement does not mean a retailer offer has been found.
+
+A retailer search result does not prove product compatibility.
+
+A compatible product does not mean it is currently in stock.
+
+An available product does not mean the user has purchased it.
+
+Creating an action does not mean the user authorized that action.
+
+This distinction is especially important because future Howlsy workflows may locate products, open retailer pages, prepare purchases, schedule services, or perform other external operations.
+
+Explicit user authorization must remain separate from AI planning and retrieval state.
+
+---
+
+### Type Contract Expansion
+
+The project type system was expanded to represent the Resource and Action Engine explicitly.
+
+New resource concepts include:
+
+ProjectResourceOrigin
+
+ProjectResourceRetrievalStatus
+
+Additional resource verification states:
+
+requested
+retrieved
+
+The resource contract also gained support for:
+
+annotated_image
+
+Resource provenance and retrieval state are modeled separately so Howlsy can distinguish where information came from from whether it has actually been retrieved or verified.
+
+The project model also introduced:
+
+ProjectProductOfferAvailability
+
+ProjectProductOffer
+
+ProjectResourceRequestPurpose
+
+ProjectResourceRequest
+
+ProjectActionType
+
+ProjectActionStatus
+
+ProjectAction
+
+Each `ProjectStep` now requires:
+
+resourceRequests
+
+resources
+
+products
+
+productOffers
+
+actions
+
+This gives the project model explicit locations for planned resource needs, fulfilled resources, product requirements, live retailer offers, and real-world actions.
+
+---
+
+### AI Planning Boundary Fix
+
+The AI project-generation route was updated to satisfy the stronger `ProjectStep` contract.
+
+Newly generated steps now initialize:
+
+resourceRequests: []
+
+productOffers: []
+
+actions: []
+
+These collections intentionally begin empty.
+
+The planning endpoint does not currently perform live web retrieval, retailer inventory lookup, compatibility verification, media generation, or external actions.
+
+It therefore must not fabricate:
+
+product offers
+
+retailer inventory
+
+prices
+
+purchase URLs
+
+retrieved resources
+
+verified compatibility
+
+authorized actions
+
+The planning endpoint continues to describe useful visual guidance through `visualInstructions`, while later Resource Engine systems will be responsible for actual retrieval, generation, verification, and attachment.
+
+---
+
+### Mock Project Migration
+
+The development mock project contained three `ProjectStep` records using the previous contract.
+
+Each mock step was updated to initialize:
+
+resourceRequests: []
+
+productOffers: []
+
+actions: []
+
+This keeps development fixtures aligned with the same contract used by generated and persisted projects.
+
+The mock project is therefore no longer a weaker representation of a project than the production model.
+
+---
+
+### Persistence Migration
+
+The browser persistence boundary required special treatment because users may already have projects stored under an older schema.
+
+`normalizeProjectStep()` was updated so legacy projects missing the Resource and Action Engine collections migrate safely.
+
+Missing legacy values become:
+
+resourceRequests: []
+
+productOffers: []
+
+actions: []
+
+An empty collection has a precise meaning:
+
+nothing has been requested, offered, or authorized yet.
+
+The migration deliberately does not reconstruct these records from existing AI instructions, visual instructions, product references, or other legacy text.
+
+Doing so could falsely imply that Howlsy had:
+
+retrieved a resource
+
+found a retailer offer
+
+verified compatibility
+
+confirmed availability
+
+received user authorization
+
+The persistence layer also gained recognition for the expanded resource contract, including:
+
+annotated_image
+
+requested
+
+retrieved
+
+This allows the runtime validation boundary to remain aligned with the TypeScript resource model.
+
+---
+
+### Initial Migration Verification Failure
+
+The first manual legacy-migration verification did not produce the expected result.
+
+A generated five-step project was deliberately converted into a legacy representation by removing:
+
+resourceRequests
+
+productOffers
+
+actions
+
+from every persisted step.
+
+Before migration, the browser console confirmed all five steps reported:
+
+hasResourceRequests: false
+
+hasProductOffers: false
+
+hasActions: false
+
+After an initial refresh, the project still rendered, but inspection of localStorage showed the new fields as:
+
+undefined
+
+That result was treated as a failed migration verification rather than being ignored.
+
+The code path was investigated before making additional changes.
+
+A project-store usage search confirmed that `/project` calls `getProject()` during its mount lifecycle.
+
+Inspection of `app/project/page.tsx` confirmed that the page:
+
+calls `getProject()`
+
+stores the returned project in React state
+
+does not call `saveProject()`
+
+Therefore the project page itself was not overwriting the normalized project with the legacy representation.
+
+A clean development-server restart was then performed so the migration test would execute against the current persistence implementation.
+
+---
+
+### Controlled Legacy Migration Verification
+
+The same intentionally downgraded five-step project remained in localStorage.
+
+The `/project` route was loaded again after the clean development-server restart.
+
+The project loaded successfully without requiring browser storage to be cleared.
+
+Inspection of the persisted project then showed that every legacy step had automatically gained:
+
+resourceRequests: []
+
+productOffers: []
+
+actions: []
+
+The test therefore demonstrated the complete migration path:
+
+old persisted ProjectStep
+    ↓
+getProject()
+    ↓
+normalizeProjectStep()
+    ↓
+current ProjectStep contract
+    ↓
+save normalized project
+    ↓
+updated localStorage
+
+The existing project remained usable while its persisted representation was upgraded to the current schema.
+
+---
+
+### Production Verification
+
+After migrating all affected construction boundaries, the production build was run again:
+
+npm run build
+
+The result completed successfully:
+
+Compiled successfully
+
+Finished TypeScript successfully
+
+Collected page data successfully
+
+Generated all static pages successfully
+
+Finalized page optimization successfully
+
+The application routes included:
+
+/
+├ /_not-found
+├ /api/projects/generate
+├ /guided
+├ /icon.svg
+├ /intake
+└ /project
+
+This confirmed that the stronger Resource and Action Engine contract no longer breaks the production type check.
+
+---
+
+### Result
+
+Issue #2 established the initial typed foundation for Howlsy's Resource and Action Engine while preserving existing projects.
+
+The migration now guarantees that current project steps have explicit state for:
+
+resource requests
+
+fulfilled resources
+
+product requirements
+
+retailer offers
+
+actions
+
+Legacy projects can move forward without fabricated enrichment or authorization data.
+
+The AI planning layer also remains separated from time-sensitive or externally verified information.
+
+The implementation preserves a core Howlsy trust invariant:
+
+AI-generated does not mean verified.
+
+Found online does not mean compatible.
+
+Compatible does not mean in stock.
+
+In stock does not mean purchased.
+
+An available action does not mean authorized.
+
+---
+
+### Technical Lesson
+
+Strengthening a shared TypeScript contract can intentionally expose hidden integration boundaries.
+
+The correct response is not always to make new fields optional.
+
+In this case, the type-check failure identified every place where the previous `ProjectStep` contract was still being constructed.
+
+The migration also demonstrated that compile-time correctness and runtime data migration are separate responsibilities.
+
+A successful production build proved that current source code satisfied the new contract.
+
+It did not prove that projects already stored in a browser could survive the schema change.
+
+That required a separate controlled legacy-data test.
+
+The failed first verification was also useful evidence.
+
+Rather than treating a rendered page as proof of migration, persisted data was inspected directly. That exposed the difference between the expected migration result and the state actually stored in the browser and led to a clean-runtime verification.
+
+For Howlsy, future persisted-schema changes should therefore verify both:
+
+current code satisfies the new contract
+
+and
+
+legacy runtime data migrates into that contract without inventing state or destroying user progress.
+
+---
+
 Howlsy development follows a simple rule:
 
 > Build the application in small, verifiable milestones and preserve the reasoning behind meaningful technical decisions.
