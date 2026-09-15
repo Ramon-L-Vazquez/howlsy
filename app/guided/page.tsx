@@ -84,6 +84,7 @@ export default function GuidedPage() {
     useState(true);
 
   useEffect(() => {
+  const timeoutId = window.setTimeout(() => {
     const storedProject = getProject();
 
     if (!storedProject) {
@@ -148,7 +149,12 @@ export default function GuidedPage() {
         allStepsComplete
     );
 
-    setIsLoading(false);
+        setIsLoading(false);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, []);
 
   function persistCurrentStep(

@@ -71,11 +71,17 @@ export default function ProjectPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+  const timeoutId = window.setTimeout(() => {
     const storedProject = getProject();
 
     setProject(storedProject);
     setIsLoading(false);
-  }, []);
+  }, 0);
+
+  return () => {
+    window.clearTimeout(timeoutId);
+  };
+}, []);
 
   function handleStartGuidedMode() {
     router.push("/guided");
