@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
 import { openai } from "@/lib/openai";
+import { planProjectResources } from "@/lib/resource-engine";
 import type { HowlsyProject } from "@/types/project";
 
 type GenerateProjectRequest = {
@@ -1011,7 +1012,9 @@ ${constraints || "No constraints provided."}
               source:
                 measurement.source || undefined,
 
-              verified: measurement.verified,
+              // This route has no independently verified evidence.
+              // A model-provided flag must not bypass verification requests.
+              verified: false,
             })
           ),
 
@@ -1027,7 +1030,7 @@ ${constraints || "No constraints provided."}
               source:
                 specification.source || undefined,
 
-              verified: specification.verified,
+              verified: false,
             })
           ),
 
@@ -1046,10 +1049,8 @@ ${constraints || "No constraints provided."}
             })),
 
           /*
-           * Resource requests belong to Howlsy's enrichment pipeline.
-           * The current planning endpoint does not retrieve or generate
-           * external resources, so new steps begin with no fulfilled
-           * enrichment requests.
+           * The application compiles this queue after assigning step IDs.
+           * The planning model never supplies request IDs or retrieval state.
            */
           resourceRequests: [],
 
@@ -1120,30 +1121,11 @@ ${constraints || "No constraints provided."}
       ),
 
       /*
-       * The planning endpoint has no retrieval system yet, so it must
-       * not fabricate citations. Real sources will be populated by a
-       * dedicated retrieval and verification layer.
+       * Intake currently contains free-form text, not validated source
+       * records. Keep any source hints in the planning fields; actual
+       * citations must come from the retrieval and verification layer.
        */
-      sources: generatedPlan.sources.map(
-        (source) => ({
-          id: randomUUID(),
-
-          title: source.title,
-
-          publisher:
-            source.publisher || undefined,
-
-          url:
-            source.url || undefined,
-
-          sourceType: source.sourceType,
-
-          verified: source.verified,
-
-          notes:
-            source.notes || undefined,
-        })
-      ),
+      sources: [],
 
       /*
        * Progress belongs to Howlsy's application state rather than the
@@ -1160,7 +1142,7 @@ ${constraints || "No constraints provided."}
     };
 
     return NextResponse.json({
-      project,
+      project: planProjectResources(project),
     });
   } catch (error) {
     console.error(

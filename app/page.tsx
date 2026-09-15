@@ -142,8 +142,14 @@ export default function Home() {
    * the server-rendering path.
    */
   useEffect(() => {
+  const timeoutId = window.setTimeout(() => {
     setSavedProject(getProject());
-  }, []);
+  }, 0);
+
+  return () => {
+    window.clearTimeout(timeoutId);
+  };
+}, []);
 
   function handleStart() {
     const trimmedGoal = goal.trim();

@@ -1,9 +1,14 @@
+import { planProjectResources } from "@/lib/resource-engine";
 import type {
   HowlsyProject,
   ProjectDifficulty,
   ProjectProductReference,
   ProjectProgress,
   ProjectResource,
+  ProjectResourceOrigin,
+  ProjectResourceRequest,
+  ProjectResourceRequestPurpose,
+  ProjectResourceRetrievalStatus,
   ProjectResourceType,
   ProjectResourceVerificationStatus,
   ProjectSource,
@@ -102,6 +107,46 @@ function isProjectResourceVerificationStatus(
     value === "retrieved" ||
     value === "unverified" ||
     value === "verified"
+  );
+}
+
+function isProjectResourceRequestPurpose(
+  value: unknown
+): value is ProjectResourceRequestPurpose {
+  return (
+    value === "show" ||
+    value === "verify" ||
+    value === "learn" ||
+    value === "find"
+  );
+}
+
+function isProjectResourceRetrievalStatus(
+  value: unknown
+): value is ProjectResourceRetrievalStatus {
+  return (
+    value === "planned" ||
+    value === "searching" ||
+    value === "found" ||
+    value === "not_found" ||
+    value === "failed"
+  );
+}
+
+function isProjectResourceOrigin(
+  value: unknown
+): value is ProjectResourceOrigin {
+  return (
+    value === "howlsy_generated" ||
+    value === "user_provided" ||
+    value === "manufacturer" ||
+    value === "government" ||
+    value === "professional_organization" ||
+    value === "retailer" ||
+    value === "publisher" ||
+    value === "creator" ||
+    value === "community" ||
+    value === "other"
   );
 }
 
@@ -252,6 +297,10 @@ function normalizeResource(
         ? value.captionsAvailable
         : undefined,
 
+    origin: isProjectResourceOrigin(value.origin)
+      ? value.origin
+      : undefined,
+
     sourceName: optionalString(
       value.sourceName
     ),
@@ -262,6 +311,12 @@ function normalizeResource(
 
     verificationStatus:
       value.verificationStatus,
+
+    retrievalStatus: isProjectResourceRetrievalStatus(
+      value.retrievalStatus
+    )
+      ? value.retrievalStatus
+      : undefined,
 
     interactive:
       typeof value.interactive === "boolean"
@@ -274,6 +329,59 @@ function normalizeResource(
         : undefined,
 
     notes: optionalString(value.notes),
+  };
+}
+
+/**
+ * Restores a request without inventing or resetting retrieval state.
+ * Legacy steps can omit the entire queue, but an existing request must
+ * satisfy the current contract before it is allowed into application state.
+ */
+function normalizeResourceRequest(
+  value: unknown
+): ProjectResourceRequest | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  if (
+    typeof value.id !== "string" ||
+    value.id.trim().length === 0 ||
+    !isProjectResourceRequestPurpose(value.purpose) ||
+    !isProjectResourceType(value.resourceType) ||
+    typeof value.title !== "string" ||
+    typeof value.description !== "string" ||
+    typeof value.required !== "boolean" ||
+    !isProjectResourceRetrievalStatus(value.retrievalStatus) ||
+    !isStringArray(value.resolvedResourceIds) ||
+    !isStringArray(value.resolvedProductReferenceIds) ||
+    !isStringArray(value.resolvedProductOfferIds)
+  ) {
+    return null;
+  }
+
+  if (
+    value.requestedDetails !== undefined &&
+    !isStringArray(value.requestedDetails)
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    purpose: value.purpose,
+    resourceType: value.resourceType,
+    title: value.title,
+    description: value.description,
+    required: value.required,
+    searchQuery: optionalString(value.searchQuery),
+    requestedDetails: isStringArray(value.requestedDetails)
+      ? value.requestedDetails
+      : undefined,
+    retrievalStatus: value.retrievalStatus,
+    resolvedResourceIds: value.resolvedResourceIds,
+    resolvedProductReferenceIds: value.resolvedProductReferenceIds,
+    resolvedProductOfferIds: value.resolvedProductOfferIds,
   };
 }
 
@@ -516,21 +624,41 @@ function normalizeProjectStep(
   }
 
   /*
-   * These collections are intentionally application-owned.
-   *
-   * Existing persisted projects predate the Resource & Action Engine,
-   * so absence of these properties is a valid legacy state. Migrating
-   * them to empty arrays means "nothing has been requested, retrieved,
-   * offered, or authorized yet."
-   *
-   * We deliberately do not infer these records from AI text, product
-   * references, visual instructions, or other legacy fields because
-   * doing so could falsely imply retrieval, availability, compatibility,
-   * or authorization.
+   * A missing queue is valid legacy data. A present queue must validate
+   * in full, including unique request IDs within this step. Rejecting a
+   * malformed queue leaves the stored bytes intact instead of silently
+   * overwriting existing retrieval work with an empty queue.
    */
   const resourceRequests: ProjectStep["resourceRequests"] =
     [];
 
+  if (value.resourceRequests !== undefined) {
+    if (!Array.isArray(value.resourceRequests)) {
+      return null;
+    }
+
+    const requestIds = new Set<string>();
+
+    for (const request of value.resourceRequests) {
+      const normalizedRequest = normalizeResourceRequest(request);
+
+      if (
+        !normalizedRequest ||
+        requestIds.has(normalizedRequest.id)
+      ) {
+        return null;
+      }
+
+      requestIds.add(normalizedRequest.id);
+      resourceRequests.push(normalizedRequest);
+    }
+  }
+
+  /*
+   * Offer and action persistence will be added with their fulfillment
+   * layers. Planning requests must not create commerce or authorization
+   * records.
+   */
   const productOffers: ProjectStep["productOffers"] =
     [];
 
@@ -1041,12 +1169,15 @@ export function getProject():
       /*
        * Persist the normalized current shape immediately.
        *
-       * Legacy projects therefore migrate once instead of requiring
-       * compatibility handling every time they are read.
+       * Compile missing requests for older plans after validation.
+       * Existing request IDs, statuses, and resolved IDs are preserved;
+       * every newly compiled request starts at "planned".
        */
-      saveProject(normalizedProject);
+      const plannedProject = planProjectResources(normalizedProject);
 
-      return normalizedProject;
+      saveProject(plannedProject);
+
+      return plannedProject;
     }
 
     const nestedProject =
@@ -1057,9 +1188,11 @@ export function getProject():
        * Repair the historical API response-envelope bug and save the
        * corrected project shape back to browser storage.
        */
-      saveProject(nestedProject);
+      const plannedProject = planProjectResources(nestedProject);
 
-      return nestedProject;
+      saveProject(plannedProject);
+
+      return plannedProject;
     }
 
     return null;
