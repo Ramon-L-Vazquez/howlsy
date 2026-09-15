@@ -135,6 +135,17 @@ export type EnrichProjectResourcesOptions = {
   >;
 
   /**
+   * Lets a specialized provider process only the requests it supports.
+   *
+   * Requests rejected by this predicate remain in their current state.
+   * They are not marked failed or not_found.
+   */
+  shouldEnrich?: (
+    request: Readonly<ProjectResourceRequest>,
+    context: Readonly<ResourceEnrichmentContext>
+  ) => boolean | Promise<boolean>;
+
+  /**
    * Optional hook for persisting or displaying intermediate state.
    *
    * For example, a client-side implementation can save the project
@@ -614,10 +625,25 @@ export async function enrichProjectResources(
       continue;
     }
 
-    if (
+      if (
       !allowedStatuses.has(
         live.request.retrievalStatus
       )
+    ) {
+      continue;
+    }
+
+    const enrichmentContext = buildContext(
+      currentProject,
+      live.step
+    );
+
+    if (
+      options.shouldEnrich &&
+      !(await options.shouldEnrich(
+        copyRequest(live.request),
+        enrichmentContext
+      ))
     ) {
       continue;
     }
